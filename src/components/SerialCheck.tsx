@@ -51,7 +51,7 @@ const SerialCheck = () => {
   >("loading");
 
   useEffect(() => {
-    setSerialState(navigator.serial ? "available" : "unavailable"); // Check if serial is available in the browser
+    setSerialState(navigator.serial ? "available" : "unavailable");
   }, []);
 
   if (serialState === "loading") {

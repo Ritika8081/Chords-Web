@@ -1,5 +1,4 @@
 "use client";
-import { Pause, Play } from "lucide-react";
 import React, {
   useEffect,
   useRef,
@@ -8,9 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { SmoothieChart, TimeSeries } from "smoothie";
-import { Button } from "./ui/button";
 import { useTheme } from "next-themes";
-import { Card, CardContent } from "./ui/card";
 import { BitSelection } from "./DataPass";
 
 interface CanvasProps {
@@ -19,36 +16,28 @@ interface CanvasProps {
 }
 
 const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
-  const { theme } = useTheme(); // Get the current theme
+  const { theme } = useTheme();
 
-  const channels = useMemo(() => [true, true, true, true], []); // Number of channels
+  const channels = useMemo(() => [true, true, true, true, false, false], []);
 
-  const [isPaused, setIsPaused] = useState(Array(channels.length).fill(false)); // Paused state for each channel
+  const [isPaused, setIsPaused] = useState(Array(channels.length).fill(false));
 
-  const chartRef = useRef<SmoothieChart[]>([]); // Reference to the chart
-  const seriesRef = useRef<(TimeSeries | null)[]>([]); // Reference to the timeseries
-  const [isChartInitialized, setIsChartInitialized] = useState(false); // Chart initialization state
+  const chartRef = useRef<SmoothieChart[]>([]);
+  const seriesRef = useRef<(TimeSeries | null)[]>([]);
+  const [isChartInitialized, setIsChartInitialized] = useState(false);
 
-  const batchSize = 10; // Batch size for processing data
-  const batchBuffer = useMemo<Array<{ time: number; values: number[] }>>( // Buffer for batch processing
+  const batchSize = 10;
+  const batchBuffer = useMemo<Array<{ time: number; values: number[] }>>(
     () => [],
     []
   );
 
-  const getChannelColor = useCallback(
-    // Get the color for each channel
-    (index: number) => {
-      const colorsDark = ["#FF4985", "#79E6F3", "#00FFC1", "#ccc"];
-      const colorsLight = ["#D10054", "#007A8C", "#008060", "#555555"];
-      return theme === "dark"
-        ? colorsDark[index] || colorsDark[colorsDark.length - 1]
-        : colorsLight[index] || colorsLight[colorsLight.length - 1];
-    },
-    [theme]
-  );
+  const getChannelColor = useCallback((index: number) => {
+    const colors = ["#FF4985", "#79E6F3", "#00FFC1", "#ccc"];
+    return colors[index] || colors[colors.length - 1];
+  }, []);
 
   const getThemeColors = useCallback(() => {
-    // Get the theme colors
     return theme === "dark"
       ? {
           background: "rgba(2, 8, 23)",
@@ -65,7 +54,6 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
   }, [theme]);
 
   const getMaxValue = useCallback((bits: BitSelection): number => {
-    // Get the max value for the chart
     switch (bits) {
       case "ten":
         return 1024;
@@ -79,12 +67,10 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
   }, []);
 
   const shouldAutoScale = useCallback((bits: BitSelection): boolean => {
-    // Check if the chart should autoscale
     return bits === "auto";
   }, []);
 
   const updateChartColors = useCallback(() => {
-    // Update the chart colors based on the theme
     const colors = getThemeColors();
     chartRef.current.forEach((chart, index) => {
       if (chart) {
@@ -134,7 +120,6 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
   ]);
 
   const processBatch = useCallback(() => {
-    // Process the batch data
     if (batchBuffer.length === 0) return;
 
     batchBuffer.forEach((batch) => {
@@ -152,7 +137,6 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
   }, [channels, isPaused, batchBuffer]);
 
   const handleDataUpdate = useCallback(
-    // Create batch data from the incoming data with timestamp
     (line: string) => {
       if (line.trim() !== "") {
         const sensorValues = line.split(",").map(Number).slice(1);
@@ -169,7 +153,6 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
   );
 
   useEffect(() => {
-    // Update the chart with the incoming data
     if (isChartInitialized) {
       const lines = String(data).split("\n");
       lines.forEach(handleDataUpdate);
@@ -190,7 +173,6 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
   }, [processBatch, batchBuffer]);
 
   useEffect(() => {
-    // Initialize the chart
     if (!isChartInitialized) {
       const colors = getThemeColors();
       channels.forEach((channel, index) => {
@@ -207,16 +189,14 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
 
           if (canvas) {
             const chart = new SmoothieChart({
-              // Create a new chart instance for each channel
               responsive: true,
               millisPerPixel: 8,
               interpolation: "bezier",
-              timestampFormatter: SmoothieChart.timeFormatter,
               grid: {
                 fillStyle: colors.background,
                 strokeStyle: colors.grid,
                 borderVisible: true,
-                millisPerLine: 2000,
+                millisPerLine: 250,
                 lineWidth: 1,
               },
               labels: {
@@ -234,7 +214,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
               lineWidth: 1,
             });
 
-            chart.streamTo(canvas, 500); // Stream the chart to the canvas with a delay of 500ms
+            chart.streamTo(canvas, 500);
 
             if (chartRef.current && seriesRef.current) {
               chartRef.current[index] = chart;
@@ -258,7 +238,6 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
 
   useEffect(() => {
     if (isChartInitialized) {
-      // Update the chart with the selected bits and autoscale
       chartRef.current.forEach((chart) => {
         if (chart) {
           if (shouldAutoScale(selectedBits)) {
@@ -275,13 +254,11 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
 
   useEffect(() => {
     if (isChartInitialized) {
-      // Update the chart colors based on the theme when the chart is initialized
       updateChartColors();
     }
   }, [theme, isChartInitialized, updateChartColors]);
 
   const handlePauseClick = (index: number) => {
-    // Handle the pause click for each channel
     setIsPaused((prevIsPaused) => {
       const updatedIsPaused = [...prevIsPaused];
       updatedIsPaused[index] = !prevIsPaused[index];
@@ -308,7 +285,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
                     className="w-full h-full"
                   />
                 </div>
-                <div className="absolute top-1/2 right-0 -mr-5 -mt-7 z-10">
+                {/* <div className="absolute top-1/2 right-0 -mr-5 -mt-7 z-10">
                   <Card className="bg-secondary border-primary rounded-2xl">
                     <CardContent className="flex flex-col p-1 items-center justify-center gap-2">
                       <Button
@@ -326,7 +303,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, selectedBits }) => {
                       <p className="text-[10px]">{`CH${index + 1}`}</p>
                     </CardContent>
                   </Card>
-                </div>
+                </div> */}
               </div>
             );
           }

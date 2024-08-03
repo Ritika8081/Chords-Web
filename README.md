@@ -13,7 +13,6 @@ BioSignal Web Recorder is an application based on Web Serial connection, you can
 - **Bi Directional Communication**: We can also write data in the board, the table below shows what we recieve if sent data is:
 <div>
 
-
 | Sent Data | Data Received | Value                 |
 | :-------: | ------------- | --------------------- |
 |    'c'    | Channel Count | 6                     |
@@ -25,9 +24,9 @@ BioSignal Web Recorder is an application based on Web Serial connection, you can
 
 ## Compatible Browsers
 
-| Feature | Chrome | Edge | Firefox | Opera | Safari | Chrome Android | Firefox for Android | Safari iOS | Samsung Internet | WebView Android |
-| ------- | ------ | ---- | ------- | ----- | ------ | -------------- | ------------------- | ---------- | ---------------- | --------------- |
-| ✅      | ✅     | ✅   | ❌      | ✅    | ❌     | ❌             | ❌                  | ❌         | ❌               | ❌              |
+| Feature | Chrome | Edge | Firefox | Opera | Safari |
+| ------- | ------ | ---- | ------- | ----- | ------ |
+| ✅      | ✅     | ✅   | ❌      | ✅    | ❌     |
 
 ## How to use
 
