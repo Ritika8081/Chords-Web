@@ -40,9 +40,7 @@ import {
 import { getRandomValues } from "crypto";
 interface Dataset {
   id: number;
-  timestamp: string;
   data: string[]; // Each dataset is an array of strings
-
 }
 interface ConnectionProps {
   onPauseChange: (pause: boolean) => void; // Callback to pass pause state to parent
@@ -100,7 +98,6 @@ const Connection: React.FC<ConnectionProps> = ({
   const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(
     null
   );
-  const [refreshData, setRefreshData] = useState(false);
   const buffer: number[] = []; // Buffer to store incoming data
   const bufferdRef = useRef<number[][][]>([[], []]); // Two buffers: [0] and [1]
 
@@ -108,7 +105,6 @@ const Connection: React.FC<ConnectionProps> = ({
   // Define the Dataset type
   type Dataset = {
     sessionId: string; // Include sessionId for reference
-    timestamp: string;
     data: object[]; // Actual data
   };
 
@@ -116,51 +112,46 @@ const Connection: React.FC<ConnectionProps> = ({
   useEffect(() => {
     const fetchDataFromIndexedDB = async () => {
       try {
-        const db = await initIndexedDB();
-        const transaction = db.transaction("adcReadings", "readonly");
-        const objectStore = transaction.objectStore("adcReadings");
-  
-        const groupedData: Record<string, { data: object[]; timestamp: string }> = {};
+        const db = await initIndexedDB(); // Ensure database is initialized
+        const transaction = db.transaction('adcReadings', 'readonly');
+        const objectStore = transaction.objectStore('adcReadings');
+
+        const groupedData: Record<string, object[]> = {};
         const cursorRequest = objectStore.openCursor();
-  
+
         cursorRequest.onsuccess = () => {
           const cursor = cursorRequest.result;
           if (cursor) {
-            const { sessionId, timestamp } = cursor.value;
-  
+            const { sessionId } = cursor.value;
+
             if (!groupedData[sessionId]) {
-              groupedData[sessionId] = { data: [], timestamp };
+              groupedData[sessionId] = [];
             }
-            groupedData[sessionId].data.push(cursor.value);
-  
+            groupedData[sessionId].push(cursor.value);
+
             cursor.continue();
+          } else {
+            const transformedDatasets: Dataset[] = Object.entries(groupedData).map(([sessionId, data]) => ({
+              sessionId: sessionId,
+              data,
+            }));
+
+            setDatasets(transformedDatasets);
           }
         };
-  
-        transaction.oncomplete = () => {
-          const transformedDatasets: Dataset[] = Object.entries(groupedData).map(
-            ([sessionId, { data, timestamp }]) => ({
-              sessionId,
-              data,
-              timestamp,
-            })
-          );
-  
-          setDatasets(transformedDatasets);
-        };
-  
+
         cursorRequest.onerror = (event) => {
-          console.error("Error fetching data from IndexedDB:", event);
+          console.error('Error fetching data from IndexedDB:', event);
         };
       } catch (error) {
-        console.error("Error interacting with IndexedDB:", error);
+        console.error('Error interacting with IndexedDB:', error);
       }
     };
-  
+
     fetchDataFromIndexedDB();
-  }, [refreshData]); // Add dependency to refetch when refreshData changes
-  
-  const triggerRefresh = () => setRefreshData((prev) => !prev); // Toggles refresh state
+  }, []);
+
+
 
   const togglePause = () => {
     const newPauseState = !isDisplay;
@@ -485,12 +476,6 @@ const Connection: React.FC<ConnectionProps> = ({
   const handleRecord = async () => {
     // Check if a device is connected
     if (isConnected) {
-      // Check the length of existing datasets
-      if (datasets.length >= 3) {
-        toast.error(`You have reached the maximum allowed datasets limit (${3}).`);
-        return; // Stop further execution if the limit is reached
-      }
-  
       // If recording is already in progress, stop it
       if (isRecordingRef.current) {
         stopRecording(); // Stop the recording if it is already on
@@ -503,10 +488,10 @@ const Connection: React.FC<ConnectionProps> = ({
         setElapsedTime(0); // Reset elapsed time for display
         timerIntervalRef.current = setInterval(checkRecordingTime, 1000); // Start a timer to check recording duration every second
         setrecData(true); // Set the state indicating recording data is being collected
-  
+
         // Generate a unique session ID for this recording session
         const sessionId = `session-${Math.random().toString()}`;
-  
+
         // Initialize IndexedDB for this recording session
         try {
           const db = await initIndexedDB(); // Attempt to initialize the IndexedDB
@@ -515,9 +500,8 @@ const Connection: React.FC<ConnectionProps> = ({
           // Handle any errors during the IndexedDB initialization
           console.error("Failed to initialize IndexedDB:", error);
           toast.error("Failed to initialize storage. Recording may not be saved.");
-          return; // Exit if initialization fails
         }
-  
+
         // Start reading and saving data
         recordingIntervalRef.current = setInterval(() => {
           const data = bufferRef.current; // Use bufferRef which stores actual data
@@ -530,7 +514,6 @@ const Connection: React.FC<ConnectionProps> = ({
       toast.warning("No device is connected");
     }
   };
-  
 
   const checkRecordingTime = () => {
     setElapsedTime((prev) => {
@@ -555,39 +538,27 @@ const Connection: React.FC<ConnectionProps> = ({
 
   // Updated stopRecording function
   const stopRecording = async () => {
-    // Clear the recording timer
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-   
 
-    const endTime = new Date(); // Get the end time of the recording
-
-    // Fetch the number of recorded files from IndexedDB
+    const endTime = new Date();
     const recordedFilesCount = (await getAllDataFromIndexedDB()).length;
+
     if (startTimeRef.current !== null) {
-      // Convert start and end times to readable format
       const startTimeString = new Date(startTimeRef.current).toLocaleTimeString();
       const endTimeString = endTime.toLocaleTimeString();
-
-      // Calculate the duration in seconds
       const durationInSeconds = Math.floor((endTime.getTime() - startTimeRef.current) / 1000);
 
-      // Close the IndexedDB connection
       if (indexedDBRef.current) {
         indexedDBRef.current.close();
         indexedDBRef.current = null;
       }
 
-      // Fetch all recorded data from IndexedDB
       const allData = await getAllDataFromIndexedDB();
-      // console.log("datasets",datasets);
-      // console.log("length of datasets:", datasets.length);
       setHasData(allData.length > 0);
-  triggerRefresh(); // Trigger a UI refresh
 
-      // Show a success toast with details of the recording
       toast.success("Recording completed successfully", {
         description: (
           <div>
@@ -600,18 +571,18 @@ const Connection: React.FC<ConnectionProps> = ({
         ),
       });
 
-      // Update states after recording is completed
-      isRecordingRef.current = false; // Set recording state to false
-      setElapsedTime(0); // Reset the elapsed time
-      setrecData(false); // Indicate that recording is not in progress
-      setIsRecordButtonDisabled(true); // Disable the record button
-      setSessionId(null); // Clear session ID after recording stops
+      // Reset states
+      isRecordingRef.current = false;
+      setElapsedTime(0);
+      setrecData(false);
+      setIsRecordButtonDisabled(true);
+      setSessionId(null); // Clear session ID when recording is stopped
     } else {
-      // If start time is null, log an error and show a toast
       console.error("Start time is null. Unable to calculate duration.");
       toast.error("Recording start time was not captured.");
     }
   };
+
 
   // Call this function when your component mounts or when you suspect the data might change
   useEffect(() => {
@@ -619,15 +590,13 @@ const Connection: React.FC<ConnectionProps> = ({
       // Check if data exists in IndexedDB
       const allData = await getAllDataFromIndexedDB();
       setHasData(allData.length > 0);
-      // setDatasets(datasets.length)
 
       // Disable the record button if there is data in IndexedDB and device is connected
       setIsRecordButtonDisabled(allData.length > 0 || !isConnected);
     };
 
     checkDataAndConnection();
-  }, [isConnected, stopRecording]);
-
+  }, [isConnected]);
 
   // Add this function to save data to IndexedDB during recording
   const saveDataDuringRecording = async (data: number[][], sessionId: string) => {
@@ -673,7 +642,7 @@ const Connection: React.FC<ConnectionProps> = ({
   const initIndexedDB = async (): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
       // Open a connection to the IndexedDB database, increment version if schema changes
-      const request = indexedDB.open("adcReadings", 2); // Increment version if needed
+      const request = indexedDB.open("adcReadings", 4); // Increment version if needed
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
@@ -736,69 +705,63 @@ const Connection: React.FC<ConnectionProps> = ({
   const deleteFilesBySessionId = async (sessionId: string) => {
     try {
       const dbRequest = indexedDB.open("adcReadings");
-  
+
       dbRequest.onsuccess = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         const transaction = db.transaction("adcReadings", "readwrite");
         const store = transaction.objectStore("adcReadings");
-  
-        // Check if the "sessionId" index exists
+
+        // Check if the index exists
         if (!store.indexNames.contains("sessionId")) {
-          console.error("Index 'sessionId' does not exist.");
-          toast.error("Unable to delete files: index not found.");
-          return;
+          throw new Error("Index 'sessionId' does not exist.");
         }
-  
+
         const index = store.index("sessionId");
+
+        // Open cursor with KeyRange
         const deleteRequest = index.openCursor(IDBKeyRange.only(sessionId));
-  
+
         deleteRequest.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-  
+
           if (cursor) {
-            cursor.delete(); // Delete the current record
-            cursor.continue(); // Move to the next matching record
+            cursor.delete(); // Delete the record
+            cursor.continue(); // Move to the next record
           }
         };
-  
+
         deleteRequest.onerror = () => {
-          console.error("Error during delete operation.");
-          toast.error("Failed to delete files. Please try again.");
+          throw new Error("Failed to delete data.");
         };
-  
+
         // Ensure transaction completion
         transaction.oncomplete = () => {
-          console.log("Files successfully deleted for session:", sessionId);
-  
-          // Update the datasets state by filtering out the deleted session
-          setDatasets((prevDatasets) =>
-            prevDatasets.filter((dataset) => dataset.sessionId !== sessionId)
-          );
-  
-          // Show a toast notification for successful deletion
-          toast.success("File deleted successfully.");
+          // Successfully deleted from IndexedDB, now update the datasets state
+          // Filter out the deleted file from the datasets array
+          setDatasets(prevDatasets => prevDatasets.filter(dataset => dataset.sessionId !== sessionId));
+
+          // Show toast notification for successful deletion
+          toast.success("File deleted successfully");
         };
-  
+
         transaction.onerror = () => {
-          console.error("Transaction failed during deletion.");
-          toast.error("Failed to delete files. Please try again.");
+          throw new Error("Transaction failed.");
         };
       };
-  
+
       dbRequest.onerror = () => {
-        console.error("Failed to open IndexedDB database.");
-        toast.error("An error occurred while accessing the database.");
+        throw new Error("Failed to open database.");
       };
     } catch (error) {
-      console.error("Error occurred during file deletion:", error);
-      toast.error("An unexpected error occurred. Please try again.");
+      // Handle errors and show toast notification if needed
+      toast.error("An error occurred during deletion.");
     }
   };
-  
+
 
   const saveDataBySessionId = async (sessionId: string) => {
     try {
-      // Fetch the data matching the sessionId from IndexedDB
+      // Fetch data matching session ID from IndexedDB
       const data = await getDataBySessionId(sessionId);
 
       // Ensure `data` is an array
@@ -807,31 +770,23 @@ const Connection: React.FC<ConnectionProps> = ({
         return;
       }
 
-      // Get the timestamp of the session
-      const sessionData = data[0]; // Assuming the first entry contains the timestamp (you can adjust if needed)
-      const timestamp = sessionData?.timestamp; // Extract the timestamp
-      if (!timestamp) {
-        toast.error("Timestamp not found for this session.");
-        return;
-      }
-
-      // Convert data to CSV
       const csvData = convertToCSV(data);
 
-      // Create a Blob from the CSV data
       const blob = new Blob([csvData], { type: "text/csv;charset=utf-8" });
 
-      // Format the timestamp for the filename (e.g., YYYYMMDD-HHMMSS)
-      const formattedTimestamp = new Date(timestamp);
-      const formattedDate = `${formattedTimestamp.getFullYear()}${String(formattedTimestamp.getMonth() + 1).padStart(2, "0")}${String(formattedTimestamp.getDate()).padStart(2, "0")}`;
-      const formattedTime = `${String(formattedTimestamp.getHours()).padStart(2, "0")}${String(formattedTimestamp.getMinutes()).padStart(2, "0")}${String(formattedTimestamp.getSeconds()).padStart(2, "0")}`;
-      const finalTimestamp = `${formattedDate}-${formattedTime}`;
+      // Generate a timestamped filename
+      const now = new Date();
+      const formattedTimestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+        now.getDate()
+      ).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(
+        now.getSeconds()
+      ).padStart(2, "0")}`;
+      const filename = `session_${sessionId}_${formattedTimestamp}.csv`;
 
-      // Generate the filename using the sessionId and formatted timestamp
-      const filename = `chordsweb-${finalTimestamp}.csv`;
+      // Trigger file download
+      saveAs(blob, filename);
 
-      // Trigger file download with the generated filename
-      saveAs(blob, filename); // FileSaver.js
+      // Notify user of success
       toast.success("Data downloaded successfully.");
     } catch (error) {
       console.error("Error saving data by sessionId:", error);
@@ -841,76 +796,54 @@ const Connection: React.FC<ConnectionProps> = ({
 
   // Updated `getAllDataFromIndexedDB` to include IDs
   const getAllDataFromIndexedDB = async (): Promise<any[]> => {
-    try {
-      const db = await initIndexedDB();
-      const tx = db.transaction(["adcReadings"], "readonly");
-      const store = tx.objectStore("adcReadings");
-      const request = store.getAll();
-  
-      return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const db = await initIndexedDB();
+        const tx = db.transaction(["adcReadings"], "readonly");
+        const store = tx.objectStore("adcReadings");
+
+        const request = store.getAll();
         request.onsuccess = () => {
-          const data = request.result.map((item: any, index: number) => ({
+          console.log("Data retrieved from IndexedDB:", request.result); // Log to debug
+          resolve(request.result.map((item: any, index: number) => ({
             id: index + 1,
             ...item,
-          }));
-          resolve(data);
+          })));
         };
-  
+
         request.onerror = (error) => {
           console.error("Error retrieving data from IndexedDB:", error);
           reject(error);
         };
-      });
-    } catch (error) {
-      console.error("Error during IndexedDB operation:", error);
-      return [];
-    }
+      } catch (error) {
+        console.error("Error during IndexedDB operation:", error);
+        reject(error);
+      }
+    });
   };
-  
 
   // Function to delete all data from IndexedDB (for ZIP files or clear all)
-  const deleteAllDataFromIndexedDB = async () => {
-    try {
-      const dbRequest = indexedDB.open("adcReadings", 2); // Open with the same version
-      dbRequest.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-  
-        if (db.objectStoreNames.contains("adcReadings")) {
-          db.deleteObjectStore("adcReadings"); // Delete the store
-        }
-  
-        // Recreate the object store
-        const store = db.createObjectStore("adcReadings", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        store.createIndex("timestamp", "timestamp", { unique: false });
-        store.createIndex("sessionId", "sessionId", { unique: false });
-      };
-  
-      dbRequest.onsuccess = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        db.close(); // Close the database connection
-  
-        // Clear state and update UI
-        setHasData(false);
-        setDatasets([]);
-        setPopoverVisible(false);
-        toast.success("All files deleted successfully.");
-      };
-  
-      dbRequest.onerror = (error) => {
-        console.error("Failed to delete and reset IndexedDB:", error);
-        toast.error("Failed to delete all files. Please try again.");
-      };
-    } catch (error) {
-      console.error("Error deleting all data from IndexedDB:", error);
-      toast.error("Failed to delete all files. Please try again.");
-    }
-  };
-  
-  
-  
+ const deleteAllDataFromIndexedDB = async () => {
+  try {
+    const db = await initIndexedDB();
+    const tx = db.transaction(["adcReadings"], "readwrite");
+    const store = tx.objectStore("adcReadings");
+
+    await store.clear();
+    console.log("All data deleted from IndexedDB");
+
+    toast.success("All files deleted successfully.");
+
+    // Update state
+    setHasData(false);
+    setDatasets([]); // Properly reset datasets state
+    setPopoverVisible(false); // Ensure popover is hidden
+  } catch (error) {
+    console.error("Error deleting all data from IndexedDB:", error);
+    toast.error("Failed to delete all files. Please try again.");
+  }
+};
+
 
   // Function to save a ZIP file containing all datasets
   const saveAllDataAsZip = async () => {
@@ -941,27 +874,21 @@ const Connection: React.FC<ConnectionProps> = ({
         zip.file(fileName, csvData); // Add CSV file to the ZIP
       });
 
-      // Extract the earliest or most recent timestamp from the data for the ZIP file name
-      const earliestTimestamp = allData.reduce((earliest, item) => {
-        return !earliest || new Date(item.timestamp) < new Date(earliest.timestamp) ? item : earliest;
-      }, null)?.timestamp;
-
-      if (!earliestTimestamp) {
-        toast.error("Timestamp not found in the data.");
-        return;
-      }
-
-      // Format the timestamp for the ZIP filename (e.g., YYYYMMDD-HHMMSS)
-      const formattedTimestamp = new Date(earliestTimestamp);
-      const formattedDate = `${formattedTimestamp.getFullYear()}${String(formattedTimestamp.getMonth() + 1).padStart(2, "0")}${String(formattedTimestamp.getDate()).padStart(2, "0")}`;
-      const formattedTime = `${String(formattedTimestamp.getHours()).padStart(2, "0")}${String(formattedTimestamp.getMinutes()).padStart(2, "0")}${String(formattedTimestamp.getSeconds()).padStart(2, "0")}`;
-      const finalTimestamp = `${formattedDate}-${formattedTime}`;
-
       // Generate the ZIP file
       const content = await zip.generateAsync({ type: "blob" });
 
-      // Download the ZIP file with a name that includes the timestamp from the data
-      saveAs(content, `ChordsWeb-${finalTimestamp}.zip`); // FileSaver.js
+      // Get the current timestamp for the ZIP file name
+      const now = new Date();
+      const formattedTimestamp = `${now.getFullYear()}-${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
+        now.getHours()
+      ).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(
+        now.getSeconds()
+      ).padStart(2, "0")}`;
+
+      // Download the ZIP file with a name that includes the timestamp
+      saveAs(content, `all_data_${formattedTimestamp}.zip`); // FileSaver.js
       setHasData(false);
       toast.success("ZIP file downloaded successfully.");
     } catch (error) {
@@ -969,6 +896,8 @@ const Connection: React.FC<ConnectionProps> = ({
       toast.error("Failed to create ZIP file. Please try again.");
     }
   };
+
+
 
 
   return (
@@ -1191,106 +1120,105 @@ const Connection: React.FC<ConnectionProps> = ({
         {isConnected && (
           <TooltipProvider>
             <div className="flex">
-              {/* FileArchive button enabled if at least one file exists */}
-              <Popover>
-                <PopoverTrigger asChild>
+              {/* Save Data button for a single dataset or popover trigger for multiple datasets */}
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
-                    className="rounded-xl p-4"
-                    disabled={datasets.length === 0} // Disable when no datasets exist
+                    className="rounded-xl rounded-r-none"
+                    onClick={() => {
+                      if (datasets.length >= 2) {
+                        setPopoverVisible(true); // Open popover for multiple datasets
+                      } else  {
+                        saveAllDataAsZip(); // Directly download ZIP for a single dataset
+                      }
+                    }}
+                    disabled={!hasData}
                   >
-                    <FileArchive size={16} />
+                    <Download size={16} className="mr-1" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-4 bg-white shadow-lg rounded-xl w-full">
-                  <div className="space-y-4">
-                    {datasets.length > 0 ? (
-                      <>
-                        {/* List each file with download and delete actions */}
-                        {datasets.map((dataset, index) => {
-                          const timestamp = new Date(dataset.timestamp); // Convert ISO string to Date object
-                          const formattedTimestamp = `${timestamp.getFullYear()}${(timestamp.getMonth() + 1)
-                            .toString()
-                            .padStart(2, "0")}${timestamp
-                              .getDate()
-                              .toString()
-                              .padStart(2, "0")}-${timestamp
-                                .getHours()
-                                .toString()
-                                .padStart(2, "0")}${timestamp
-                                  .getMinutes()
-                                  .toString()
-                                  .padStart(2, "0")}${timestamp
-                                    .getSeconds()
-                                    .toString()
-                                    .padStart(2, "0")}`;
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{datasets.length >= 2 ? "Download/Delete Files" : "Download Data"}</p>
+                </TooltipContent>
+              </Tooltip>
 
-                          return (
-                            <div
-                              key={dataset.sessionId}
-                              className="flex justify-between items-center"
+              <Separator orientation="vertical" className="h-full" />
+
+              {/* Delete Recording Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="rounded-xl rounded-l-none"
+                    onClick={deleteAllDataFromIndexedDB}
+                    disabled={!hasData}
+                  >
+                    <Trash2 size={20} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Delete Recording</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Popover content for multiple files */}
+              {popoverVisible && datasets.length >= 2 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button className="rounded-xl p-4 ml-1" disabled={!hasData}>
+                      ^
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-4 bg-white shadow-lg rounded-xl w-full">
+                    <div className="space-y-4">
+                      {datasets.map((dataset, index) => (
+                        <div key={dataset.sessionId} className="flex justify-between items-center">
+                          <span className="font-medium mr-4">File {index + 1}</span>
+                          <div className="flex space-x-2">
+                            <Button
+                              onClick={() => saveDataBySessionId(dataset.sessionId)}
+                              className="rounded-xl px-4"
                             >
-                              <span className="font-medium mr-4">
-                                chordsweb-{formattedTimestamp}.csv
-                              </span>
-                              <div className="flex space-x-2">
-                                <Button
-                                  onClick={() => saveDataBySessionId(dataset.sessionId)}
-                                  className="rounded-xl px-4"
-                                >
-                                  <Download size={16} />
-                                </Button>
-                                <Button
-                                  onClick={() => {
-                                    deleteFilesBySessionId(dataset.sessionId)
-                                      .then(() => {
-                                        setDatasets((prevDatasets) =>
-                                          prevDatasets.filter(
-                                            (d) => d.sessionId !== dataset.sessionId
-                                          )
-                                        );
-                                        toast.success("File deleted successfully");
-                                      })
-                                      .catch(() => {
-                                        toast.error("Failed to delete file");
-                                      });
-                                  }}
-                                  className="rounded-xl px-4"
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-
-                        {/* Download all as ZIP and delete all options */}
-                        <div className="flex justify-between mt-4">
-                          <Button
-                            onClick={saveAllDataAsZip}
-                            className="rounded-xl p-2 w-full mr-2"
-                          >
-                            Download All as Zip
-                          </Button>
-                          <Button
-                            onClick={deleteAllDataFromIndexedDB}
-                            className="rounded-xl p-2 w-full"
-                          >
-                            Delete All
-                          </Button>
+                              <Download size={16} />
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                deleteFilesBySessionId(dataset.sessionId).then(() => {
+                                  setDatasets(prevDatasets =>
+                                    prevDatasets.filter(d => d.sessionId !== dataset.sessionId)
+                                  );
+                                  toast.success("File deleted successfully");
+                                }).catch(() => {
+                                  toast.error("Failed to delete file");
+                                });
+                              }}
+                              className="rounded-xl px-4"
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
                         </div>
-                      </>
-                    ) : (
-                      <p className="text-gray-500">No files available</p>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
+                      ))}
+                      <div className="flex justify-between mt-4">
+                        <Button
+                          onClick={saveAllDataAsZip}
+                          className="rounded-xl p-2 w-full mr-2"
+                        >
+                          Download Zip
+                        </Button>
+                        <Button
+                          onClick={deleteAllDataFromIndexedDB}
+                          className="rounded-xl p-2 w-full"
+                        >
+                          Delete All
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           </TooltipProvider>
         )}
-
-
 
         {/* Canvas control buttons with tooltip */}
         {isConnected && (
