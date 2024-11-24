@@ -1285,10 +1285,10 @@ const initIndexedDB = async (): Promise<IDBDatabase> => {
                               key={dataset.sessionId}
                               className="flex justify-between items-center"
                             >
-                              <span className="font-medium mr-4">
+                              <span className="font-medium mr-4 text-black">
                                 chordsweb-{formattedTimestamp}.csv
                               </span>
-                              <div className="flex space-x-2">
+                              <div className="flex space-x-2 ">
                                 <Button
                                   onClick={() => saveDataBySessionId(dataset.sessionId)}
                                   className="rounded-xl px-4"
