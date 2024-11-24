@@ -78,6 +78,8 @@ const Connection: React.FC<ConnectionProps> = ({
   const [isRecordButtonDisabled, setIsRecordButtonDisabled] = useState(false); // New state variable
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  const [currentSessionTimestamp, setCurrentSessionTimestamp] = useState<string>(''); 
   const [hasData, setHasData] = useState(false);
   const [recData, setrecData] = useState(false);
   const [elapsedTime, setElapsedTime] = useState<number>(0); // State to store the recording duration
@@ -143,6 +145,8 @@ const Connection: React.FC<ConnectionProps> = ({
             })
           );
   
+          console.log({transformedDatasets})
+
           setDatasets(transformedDatasets);
         };
   
@@ -482,10 +486,13 @@ const Connection: React.FC<ConnectionProps> = ({
   // Function to handle the recording process
   // Function to handle the recording process
   const handleRecord = async () => {
+
+    console.log({datasets})
     // Check if a device is connected
     if (isConnected) {
       // Check the length of existing datasets
       if (datasets.length >= 3) {
+        console.log("data set length in condition",datasets.length)
         toast.error(`You have reached the maximum allowed datasets limit (${3}).`);
         return; // Stop further execution if the limit is reached
       }
@@ -505,6 +512,9 @@ const Connection: React.FC<ConnectionProps> = ({
   
         // Generate a unique session ID for this recording session
         const sessionId = `session-${Math.random().toString()}`;
+
+        setCurrentSessionTimestamp(now.toISOString());
+        setCurrentSessionId(sessionId);
   
         // Initialize IndexedDB for this recording session
         try {
@@ -584,6 +594,8 @@ const Connection: React.FC<ConnectionProps> = ({
         const allData = await getAllDataFromIndexedDB();
         // console.log("datasets",datasets);
         // console.log("length of datasets:", datasets.length);
+
+        setDatasets((datasets) => [...datasets, { sessionId: currentSessionId, timestamp: currentSessionTimestamp, data: allData}]);
         setHasData(allData.length > 0);
   
         // Show a success toast with details of the recording
@@ -605,6 +617,8 @@ const Connection: React.FC<ConnectionProps> = ({
         setrecData(false); // Indicate that recording is not in progress
         setIsRecordButtonDisabled(true); // Disable the record button
         setSessionId(null); // Clear session ID after recording stops
+        setCurrentSessionId('');
+        setCurrentSessionTimestamp('');
       } else {
         // If start time is null, log an error and show a toast
         console.error("Start time is null. Unable to calculate duration.");
@@ -887,43 +901,69 @@ const initIndexedDB = async (): Promise<IDBDatabase> => {
 
   // Function to delete all data from IndexedDB (for ZIP files or clear all)
   const deleteAllDataFromIndexedDB = async () => {
-    try {
-      const dbRequest = indexedDB.open("adcReadings", 2); // Open with the same version
-      dbRequest.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
+    return new Promise<void>((resolve, reject) => {
+      try {
+        const dbRequest = indexedDB.open("adcReadings", 2);
   
-        if (db.objectStoreNames.contains("adcReadings")) {
-          db.deleteObjectStore("adcReadings"); // Delete the store
-        }
+        dbRequest.onerror = (error) => {
+          console.error("Failed to open IndexedDB:", error);
+          reject(new Error("Failed to open database"));
+        };
   
-        // Recreate the object store
-        const store = db.createObjectStore("adcReadings", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        store.createIndex("timestamp", "timestamp", { unique: false });
-        store.createIndex("sessionId", "sessionId", { unique: false });
-      };
+        dbRequest.onsuccess = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          
+          // Start a transaction and get the object store
+          const transaction = db.transaction(["adcReadings"], "readwrite");
+          const store = transaction.objectStore("adcReadings");
+          
+          // Clear all records from the store
+          const clearRequest = store.clear();
   
-      dbRequest.onsuccess = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        db.close(); // Close the database connection
+          clearRequest.onsuccess = () => {
+            // Close the database connection
+            db.close();
+            
+            // Clear state and update UI
+            setHasData(false);
+            setDatasets([]);
+            setPopoverVisible(false);
+            toast.success("All files deleted successfully.");
+            resolve();
+          };
   
-        // Clear state and update UI
-        setHasData(false);
-        setDatasets([]);
-        setPopoverVisible(false);
-        toast.success("All files deleted successfully.");
-      };
+          clearRequest.onerror = (error) => {
+            console.error("Failed to clear IndexedDB store:", error);
+            toast.error("Failed to delete all files. Please try again.");
+            reject(error);
+          };
   
-      dbRequest.onerror = (error) => {
-        console.error("Failed to delete and reset IndexedDB:", error);
-        toast.error("Failed to delete all files. Please try again.");
-      };
-    } catch (error) {
-      console.error("Error deleting all data from IndexedDB:", error);
-      toast.error("Failed to delete all files. Please try again.");
-    }
+          transaction.onerror = (error) => {
+            console.error("Transaction failed:", error);
+            toast.error("Failed to delete all files. Please try again.");
+            reject(error);
+          };
+        };
+  
+        dbRequest.onupgradeneeded = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          
+          // Create the object store if it doesn't exist
+          if (!db.objectStoreNames.contains("adcReadings")) {
+            const store = db.createObjectStore("adcReadings", {
+              keyPath: "id",
+              autoIncrement: true,
+            });
+            store.createIndex("timestamp", "timestamp", { unique: false });
+            store.createIndex("sessionId", "sessionId", { unique: false });
+          }
+        };
+  
+      } catch (error) {
+        console.error("Error in deleteAllDataFromIndexedDB:", error);
+        reject(error);
+      }
+    });
   };
   
   
