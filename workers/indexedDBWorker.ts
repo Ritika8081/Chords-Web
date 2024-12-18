@@ -9,7 +9,7 @@ self.onmessage = async (event) => {
 
   switch (action) {
     case 'write':
-      const success = await writeToIndexedDB(db, data, filename);
+      const success = await writeToIndexedDB(db, data, filename,canvasCount);
       self.postMessage({ success });
       break;
     case 'getAllData':
@@ -68,14 +68,16 @@ const openIndexedDB = async (): Promise<IDBDatabase> => {
     request.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
   });
 };
+let chordsRecordingsStore: IDBObjectStore |undefined = undefined;
 
 // Function to write data to IndexedDB
-const writeToIndexedDB = async (db: IDBDatabase, data: number[][], filename: string): Promise<boolean> => {
+const writeToIndexedDB = async (db: IDBDatabase, data: number[][], filename: string,canvasCount:number): Promise<boolean> => {
   return new Promise((resolve, reject) => {
     const tx = db.transaction("ChordsRecordings", "readwrite");
     const store = tx.objectStore("ChordsRecordings");
-
+    chordsRecordingsStore=store;
     const getRequest = store.get(filename);
+    console.log("worker",canvasCount);
 
     getRequest.onsuccess = () => {
       const existingRecord = getRequest.result;
@@ -243,11 +245,13 @@ const saveDataByFilename = async (filename: string, canvasCount: number): Promis
 
 const getFileCountFromIndexedDB = async (db: IDBDatabase): Promise<string[]> => {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(["ChordsRecordings"], "readonly");
-    const store = tx.objectStore("ChordsRecordings");
+    // const tx = db.transaction(["ChordsRecordings"], "readonly");
+    // const store = tx.objectStore("ChordsRecordings");
     const filenames: string[] = [];
-
-    const cursorRequest = store.openCursor();
+if(chordsRecordingsStore==undefined){
+  return
+}
+    const cursorRequest = chordsRecordingsStore.openCursor();
     cursorRequest.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest).result as IDBCursorWithValue | null;
       if (cursor) {
