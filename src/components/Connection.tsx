@@ -152,7 +152,7 @@ const Connection: React.FC<ConnectionProps> = ({
   }, []);
 
 
-
+//toggle pause button
   const togglePause = () => {
     const newPauseState = !isDisplay;
     setIsDisplay(newPauseState);
