@@ -833,7 +833,6 @@ disconnect();                        }
     useEffect(() => {
         const handleResize = () => {
             createCanvasElements();
-
         };
         window.addEventListener("resize", handleResize);
         return () => {
@@ -864,7 +863,7 @@ disconnect();                        }
                     ref={canvasContainerRef}
                 >
                 </main>
-                <div className="flex-none items-center justify-center pb-4 bg-g">
+                <div className="flex-none items-center justify-center pb-4 bg-g z-10" >
                     {/* Left-aligned section */}
                     <div className="absolute left-4 flex items-center mx-0 px-0 space-x-1">
                         {isRecordingRef.current && (
