@@ -52,7 +52,7 @@ import { useTheme } from "next-themes";
 
 
 
-const websocket = () => {
+const Websocket = () => {
     const isRecordingRef = useRef<boolean>(false); // Ref to track if the device is recording
     const [isDisplay, setIsDisplay] = useState<boolean>(true); // Display state
     // UI States for Popovers and Buttons
@@ -457,7 +457,7 @@ disconnect();                        }
     const workerRef = useRef<Worker | null>(null);
 
     const initializeWorker = () => {
-        if (!workerRef.current) {
+        if (!workerRef.current && typeof window !== "undefined") {
             workerRef.current = new Worker(new URL('../../../workers/indexedDBWorker.ts', import.meta.url), {
                 type: 'module',
             });
@@ -1477,4 +1477,4 @@ disconnect();                        }
 
 }
 
-export default websocket;
+export default Websocket;
