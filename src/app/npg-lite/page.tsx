@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import React, {
     useEffect,
     useRef,
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { saveAs } from "file-saver";
 import { WebglPlot, ColorRGBA, WebglLine } from "webgl-plot";
 import Navbar from "@/components/Navbar";
-const channelColors = ["#F5A3B1", "#86D3ED", "#7CD6C8", "#C2B4E2", "#48d967", "#FFFF8C"];
 import { Button } from "@/components/ui/button";
 import { EXGFilter, Notch } from '@/components/filters';
 import {
@@ -47,9 +46,8 @@ import {
     Settings,
     Loader
 } from "lucide-react";
-import { getCustomColor } from '@/components/Colors';
+import {  lightThemeColors, darkThemeColors,getCustomColor } from '@/components/Colors';
 import { useTheme } from "next-themes";
-
 
 
 const Websocket = () => {
@@ -161,7 +159,7 @@ const Websocket = () => {
             wglp.gScaleY = Zoom;
 
 
-            const line = new WebglLine(getLineColor(channelNumber), dataPointCountRef.current);
+            const line = new WebglLine(getLineColor(channelNumber, theme), dataPointCountRef.current);
             wglp.gOffsetY = 0;
             line.offsetY = 0;
             line.lineSpaceX(-1, 2 / dataPointCountRef.current);
@@ -174,6 +172,21 @@ const Websocket = () => {
         setCanvasElements(newcanvasElements);
         setWglPlots(newWglPlots);
     };
+
+       const getLineColor = (channelNumber: number, theme: string | undefined): ColorRGBA => {
+                // Convert 1-indexed channel number to a 0-indexed index
+                const index = channelNumber - 1;
+                const colors = theme === "dark" ? darkThemeColors : lightThemeColors;
+                const hex = colors[index % colors.length];
+    
+                const r = parseInt(hex.slice(1, 3), 16) / 255;
+                const g = parseInt(hex.slice(3, 5), 16) / 255;
+                const b = parseInt(hex.slice(5, 7), 16) / 255;
+                const alpha = theme === "dark" ? 1 : 0.8;  // Slight transparency for light theme
+    
+                return new ColorRGBA(r, g, b, alpha);
+            };
+    
 
     const handleSelectAllToggle = () => {
         const enabledChannels = Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i + 1);
@@ -200,13 +213,7 @@ const Websocket = () => {
         setIsAllEnabledChannelSelected((prevState) => !prevState);
     };
 
-    const getLineColor = (index: number): ColorRGBA => {
-        const hex = channelColors[index % channelColors.length];
-        const r = parseInt(hex.slice(1, 3), 16) / 255;
-        const g = parseInt(hex.slice(3, 5), 16) / 255;
-        const b = parseInt(hex.slice(5, 7), 16) / 255;
-        return new ColorRGBA(r, g, b, 1);
-    };
+
 
     useEffect(() => {
         createCanvasElements();
@@ -847,15 +854,8 @@ disconnect();                        }
 
     }, [animate,Zoom]);
 
-    window.onload = () => {
-        setTimeout(() => {
-            window.dispatchEvent(new Event("resize"));
-        }, 100);
-    };
-
 
     return (
-        <>
             <div className="flex flex-col h-screen m-0 p-0 bg-g ">
 
                 <div className="bg-highlight">
@@ -1472,7 +1472,6 @@ disconnect();                        }
                     </div>
                 </div>
             </div>
-        </>
     );
 
 }
