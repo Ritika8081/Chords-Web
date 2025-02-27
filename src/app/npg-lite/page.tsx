@@ -46,7 +46,7 @@ import {
     Settings,
     Loader
 } from "lucide-react";
-import {  lightThemeColors, darkThemeColors,getCustomColor } from '@/components/Colors';
+import { lightThemeColors, darkThemeColors, getCustomColor } from '@/components/Colors';
 import { useTheme } from "next-themes";
 
 
@@ -133,6 +133,38 @@ const Websocket = () => {
         const newWglPlots: WebglPlot[] = [];
         const newLines: WebglLine[] = [];
 
+        // Create grid lines
+        const canvasWrapper = document.createElement("div");
+        canvasWrapper.className = "absolute inset-0";
+        const opacityDarkMajor = "0.2";
+        const opacityDarkMinor = "0.05";
+        const opacityLightMajor = "0.4";
+        const opacityLightMinor = "0.1";
+        const distanceminor = sampingrateref.current * 0.04;
+        const numGridLines = (500* 4) / distanceminor;
+
+        for (let j = 1; j < numGridLines; j++) {
+            const gridLineX = document.createElement("div");
+            gridLineX.className = "absolute bg-[rgb(128,128,128)]";
+            gridLineX.style.width = "1px";
+            gridLineX.style.height = "100%";
+            gridLineX.style.left = `${((j / numGridLines) * 100).toFixed(3)}%`;
+            gridLineX.style.opacity = j % 5 === 0 ? (theme === "dark" ? opacityDarkMajor : opacityLightMajor) : (theme === "dark" ? opacityDarkMinor : opacityLightMinor);
+            canvasWrapper.appendChild(gridLineX);
+        }
+
+        const horizontalline = 50;
+        for (let j = 1; j < horizontalline; j++) {
+            const gridLineY = document.createElement("div");
+            gridLineY.className = "absolute bg-[rgb(128,128,128)]";
+            gridLineY.style.height = "1px";
+            gridLineY.style.width = "100%";
+            gridLineY.style.top = `${((j / horizontalline) * 100).toFixed(3)}%`;
+            gridLineY.style.opacity = j % 5 === 0 ? (theme === "dark" ? opacityDarkMajor : opacityLightMajor) : (theme === "dark" ? opacityDarkMinor : opacityLightMinor);
+            canvasWrapper.appendChild(gridLineY);
+        }
+        container.appendChild(canvasWrapper);
+
 
         // Create canvasElements for each selected channel
         selectedChannels.forEach((channelNumber) => {
@@ -173,20 +205,20 @@ const Websocket = () => {
         setWglPlots(newWglPlots);
     };
 
-       const getLineColor = (channelNumber: number, theme: string | undefined): ColorRGBA => {
-                // Convert 1-indexed channel number to a 0-indexed index
-                const index = channelNumber - 1;
-                const colors = theme === "dark" ? darkThemeColors : lightThemeColors;
-                const hex = colors[index % colors.length];
-    
-                const r = parseInt(hex.slice(1, 3), 16) / 255;
-                const g = parseInt(hex.slice(3, 5), 16) / 255;
-                const b = parseInt(hex.slice(5, 7), 16) / 255;
-                const alpha = theme === "dark" ? 1 : 0.8;  // Slight transparency for light theme
-    
-                return new ColorRGBA(r, g, b, alpha);
-            };
-    
+    const getLineColor = (channelNumber: number, theme: string | undefined): ColorRGBA => {
+        // Convert 1-indexed channel number to a 0-indexed index
+        const index = channelNumber - 1;
+        const colors = theme === "dark" ? darkThemeColors : lightThemeColors;
+        const hex = colors[index % colors.length];
+
+        const r = parseInt(hex.slice(1, 3), 16) / 255;
+        const g = parseInt(hex.slice(3, 5), 16) / 255;
+        const b = parseInt(hex.slice(5, 7), 16) / 255;
+        const alpha = theme === "dark" ? 1 : 0.8;  // Slight transparency for light theme
+
+        return new ColorRGBA(r, g, b, alpha);
+    };
+
 
     const handleSelectAllToggle = () => {
         const enabledChannels = Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i + 1);
@@ -217,7 +249,7 @@ const Websocket = () => {
 
     useEffect(() => {
         createCanvasElements();
-    }, [numChannels, theme, timeBase, selectedChannels,Zoom,isConnected]);
+    }, [numChannels, theme, timeBase, selectedChannels, Zoom, isConnected]);
     useEffect(() => {
         selectedChannelsRef.current = selectedChannels;
     }, [selectedChannels]);
@@ -288,9 +320,9 @@ const Websocket = () => {
     }, [timeBase]);
     const zoomRef = useRef(Zoom);
 
-useEffect(() => {
-    zoomRef.current = Zoom;
-}, [Zoom]);
+    useEffect(() => {
+        zoomRef.current = Zoom;
+    }, [Zoom]);
 
     const sendData = useCallback(
         (ws: WebSocket, blockSize: number, startTime: number, allData: number[][]) => {
@@ -303,23 +335,24 @@ useEffect(() => {
                 const currentTime = Date.now();
                 const elapsedTime = (currentTime - startTime) / 1000;
                 if (elapsedTime >= 1.0) {
-                      console.log(
+                    console.log(
                         `FPS: ${Math.ceil(packetSize / elapsedTime)} SPS: ${Math.ceil(
-                          sampleSize / elapsedTime
+                            sampleSize / elapsedTime
                         )} BPS: ${Math.ceil(dataSize / elapsedTime)}`
-                      );
-                      if(Math.ceil(packetSize / elapsedTime)==0){
+                    );
+                    if (Math.ceil(packetSize / elapsedTime) == 0) {
                         checkref.current++;
-                        console.log( checkref.current);
-                        if( checkref.current==3){
+                        console.log(checkref.current);
+                        if (checkref.current == 3) {
                             setIsConnected(false);
                             console.log("yes");
                         }
-                        if( checkref.current==4){
+                        if (checkref.current == 4) {
                             console.log("no");
-disconnect();                        }
-                      }
-                  
+                            disconnect();
+                        }
+                    }
+
                     packetSize = 0;
                     sampleSize = 0;
                     dataSize = 0;
@@ -402,16 +435,16 @@ disconnect();                        }
             };
         },
         [
-            Zoom, zoomRef.current,checkref.current
+            Zoom, zoomRef.current, checkref.current
         ]
     );
 
-    
+
     const wsRef = useRef<WebSocket | null>(null);
     const [manualDisconnect, setManualDisconnect] = useState(false);
 
     const connect = () => {
-        checkref.current=0;
+        checkref.current = 0;
         setManualDisconnect(false);
         setIsLoading(true);
         const allData = Array.from({ length: numChannels }, () => [] as number[]);
@@ -436,7 +469,7 @@ disconnect();                        }
 
         wsRef.current.onclose = () => {
             console.log("WebSocket connection closed");
-            
+
             if (!manualDisconnect) {
                 setIsConnected(false);
                 setIsLoading(true);
@@ -446,8 +479,8 @@ disconnect();                        }
         };
     };
 
-    
-    
+
+
     const disconnect = () => {
         setManualDisconnect(true);
         setIsConnected(false);
@@ -459,8 +492,8 @@ disconnect();                        }
         }
     };
 
-    
-    
+
+
     const workerRef = useRef<Worker | null>(null);
 
     const initializeWorker = () => {
@@ -851,626 +884,626 @@ disconnect();                        }
     useEffect(() => {
         requestAnimationFrame(animate);
 
-    }, [animate,Zoom]);
+    }, [animate, Zoom]);
 
 
     return (
-            <div className="flex flex-col h-screen m-0 p-0 bg-g ">
+        <div className="flex flex-col h-screen m-0 p-0 bg-g ">
 
-                <div className="bg-highlight">
-                    <Navbar isDisplay={true} />
-                </div>            <main className=" flex flex-col flex-[1_1_0%] min-h-80 bg-highlight  rounded-2xl m-4 relative"
-                    ref={canvasContainerRef}
-                >
-                </main>
-                <div className="flex-none items-center justify-center pb-4 bg-g z-10" >
-                    {/* Left-aligned section */}
-                    <div className="absolute left-4 flex items-center mx-0 px-0 space-x-1">
-                        {isRecordingRef.current && (
-                            <div className="flex items-center space-x-1 w-min">
-                                <button className="flex items-center justify-center px-1 py-2   select-none min-w-20 bg-primary text-destructive whitespace-nowrap rounded-xl"
+            <div className="bg-highlight">
+                <Navbar isDisplay={true} />
+            </div>            <main className=" flex flex-col flex-[1_1_0%] min-h-80 bg-highlight  rounded-2xl m-4 relative"
+                ref={canvasContainerRef}
+            >
+            </main>
+            <div className="flex-none items-center justify-center pb-4 bg-g z-10" >
+                {/* Left-aligned section */}
+                <div className="absolute left-4 flex items-center mx-0 px-0 space-x-1">
+                    {isRecordingRef.current && (
+                        <div className="flex items-center space-x-1 w-min">
+                            <button className="flex items-center justify-center px-1 py-2   select-none min-w-20 bg-primary text-destructive whitespace-nowrap rounded-xl"
+                            >
+                                {formatTime(recordingElapsedTime)}
+                            </button>
+                            <Separator orientation="vertical" className="bg-primary h-9 " />
+                            <div>
+                                <Popover
+                                    open={isEndTimePopoverOpen}
+                                    onOpenChange={setIsEndTimePopoverOpen}
                                 >
-                                    {formatTime(recordingElapsedTime)}
-                                </button>
-                                <Separator orientation="vertical" className="bg-primary h-9 " />
-                                <div>
-                                    <Popover
-                                        open={isEndTimePopoverOpen}
-                                        onOpenChange={setIsEndTimePopoverOpen}
-                                    >
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                className="flex items-center justify-center px-1 py-2   select-none min-w-10  text-destructive whitespace-nowrap rounded-xl"
-                                                variant="destructive"
-                                            >
-                                                {endTimeRef.current === null ? (
-                                                    <Infinity className="h-5 w-5 text-primary" />
-                                                ) : (
-                                                    <div className="text-sm text-primary font-medium">
-                                                        {formatTime(endTimeRef.current)}
-                                                    </div>
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-64 p-4 mx-4">
-                                            <div className="flex flex-col space-y-4">
-                                                <div className="text-sm font-medium">
-                                                    Set End Time (minutes)
-                                                </div>
-                                                <div className="grid grid-cols-4 gap-2">
-                                                    {[1, 10, 20, 30].map((time) => (
-                                                        <Button
-                                                            key={time}
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleTimeSelection(time)}
-                                                        >
-                                                            {time}
-                                                        </Button>
-                                                    ))}
-                                                </div>
-                                                <div className="flex space-x-2 items-center">
-                                                    <Input
-                                                        type="text"
-                                                        inputMode="numeric"
-                                                        pattern="[0-9]*"
-                                                        placeholder="Custom"
-                                                        value={customTimeInput}
-                                                        onBlur={handlecustomTimeInputSet}
-                                                        onKeyDown={(e) =>
-                                                            e.key === "Enter" && handlecustomTimeInputSet()
-                                                        }
-                                                        onChange={handlecustomTimeInputChange}
-                                                        className="w-20"
-                                                    />
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleTimeSelection(null)}
-                                                    >
-                                                        <Infinity className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Center-aligned buttons */}
-                    <div className="flex gap-3 items-center justify-center">
-                        {/* Connection button with tooltip */}
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Popover open={open} onOpenChange={setOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                className="flex items-center gap-1 py-2 px-4 rounded-xl font-semibold"
-                                                onClick={() => (isConnected ? disconnect() : connect())}
-                                                disabled={isLoading}
-                                            >
-                                                {isLoading ? (
-                                                    <>
-                                                        <Loader size={17} className="animate-spin" />
-                                                        Connecting...
-                                                    </>
-                                                ) : isConnected ? (
-                                                    <>
-                                                        Disconnect
-                                                        <CircleX size={17} />
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        NPG-LIte Visualizer
-                                                        <Cable size={17} />
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-
-                                    </Popover>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{isConnected ? "Disconnect Device" : "Connect Device"}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-
-                        {/* Record button with tooltip */}
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        className="rounded-xl"
-                                        onClick={handleRecord}
-
-                                    >
-                                        {isRecordingRef.current ? (
-                                            <CircleStop />
-                                        ) : (
-                                            <Circle fill="red" />
-                                        )}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>
-                                        {!isRecordingRef.current
-                                            ? "Start Recording"
-                                            : "Stop Recording"}
-                                    </p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        {/* Save/Delete data buttons with tooltip */}
-                        <TooltipProvider>
-                            <div className="flex">
-                                <Popover>
                                     <PopoverTrigger asChild>
-                                        <Button className="rounded-xl p-4">
-                                            <FileArchive size={16} />
+                                        <Button
+                                            className="flex items-center justify-center px-1 py-2   select-none min-w-10  text-destructive whitespace-nowrap rounded-xl"
+                                            variant="destructive"
+                                        >
+                                            {endTimeRef.current === null ? (
+                                                <Infinity className="h-5 w-5 text-primary" />
+                                            ) : (
+                                                <div className="text-sm text-primary font-medium">
+                                                    {formatTime(endTimeRef.current)}
+                                                </div>
+                                            )}
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="p-4 text-base shadow-lg rounded-xl w-full">
-                                        <div className="space-y-4">
-                                            {/* List each file with download and delete actions */}
-                                            {datasets.length > 0 ? (
-                                                datasets.map((dataset) => (
-                                                    <div key={dataset} className="flex justify-between items-center">
-                                                        {/* Display the filename directly */}
-                                                        <span className=" mr-4">
-                                                            {dataset}
-                                                        </span>
-
-                                                        <div className="flex space-x-2">
-                                                            {/* Save file by filename */}
-                                                            <Button
-                                                                onClick={() => saveDataByFilename(dataset, canvasElementCountRef.current, selectedChannels)}
-                                                                className="rounded-xl px-4"
-                                                            >
-                                                                <Download size={16} />
-                                                            </Button>
-
-                                                            {/* Delete file by filename */}
-                                                            <Button
-                                                                onClick={() => {
-                                                                    deleteFileByFilename(dataset);
-                                                                }}
-                                                                className="rounded-xl px-4"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-base ">No datasets available</p>
-                                            )}
-                                            {/* Download all as ZIP and delete all options */}
-                                            {datasets.length > 0 && (
-                                                <div className="flex justify-between mt-4">
+                                    <PopoverContent className="w-64 p-4 mx-4">
+                                        <div className="flex flex-col space-y-4">
+                                            <div className="text-sm font-medium">
+                                                Set End Time (minutes)
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {[1, 10, 20, 30].map((time) => (
                                                     <Button
-                                                        onClick={saveAllDataAsZip}
-                                                        className="rounded-xl p-2 w-full mr-2"
+                                                        key={time}
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleTimeSelection(time)}
                                                     >
-                                                        Download All as Zip
+                                                        {time}
                                                     </Button>
-                                                    <Button
-                                                        onClick={deleteAllDataFromIndexedDB}
-                                                        className="rounded-xl p-2 w-full"
-                                                    >
-                                                        Delete All
-                                                    </Button>
-                                                </div>
-                                            )}
+                                                ))}
+                                            </div>
+                                            <div className="flex space-x-2 items-center">
+                                                <Input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    placeholder="Custom"
+                                                    value={customTimeInput}
+                                                    onBlur={handlecustomTimeInputSet}
+                                                    onKeyDown={(e) =>
+                                                        e.key === "Enter" && handlecustomTimeInputSet()
+                                                    }
+                                                    onChange={handlecustomTimeInputChange}
+                                                    className="w-20"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleTimeSelection(null)}
+                                                >
+                                                    <Infinity className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                        </TooltipProvider>
-                        {/* filters */}
-                        <Popover
-                            open={isFilterPopoverOpen}
-                            onOpenChange={setIsFilterPopoverOpen}
-                        >
-                            <PopoverTrigger asChild>
+                        </div>
+                    )}
+                </div>
+
+                {/* Center-aligned buttons */}
+                <div className="flex gap-3 items-center justify-center">
+                    {/* Connection button with tooltip */}
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Popover open={open} onOpenChange={setOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            className="flex items-center gap-1 py-2 px-4 rounded-xl font-semibold"
+                                            onClick={() => (isConnected ? disconnect() : connect())}
+                                            disabled={isLoading}
+                                        >
+                                            {isLoading ? (
+                                                <>
+                                                    <Loader size={17} className="animate-spin" />
+                                                    Connecting...
+                                                </>
+                                            ) : isConnected ? (
+                                                <>
+                                                    Disconnect
+                                                    <CircleX size={17} />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    NPG-LIte Visualizer
+                                                    <Cable size={17} />
+                                                </>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+
+                                </Popover>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{isConnected ? "Disconnect Device" : "Connect Device"}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+
+                    {/* Record button with tooltip */}
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
                                 <Button
-                                    className="flex items-center justify-center px-3 py-2 select-none min-w-12 whitespace-nowrap rounded-xl"
-                                    disabled={!isDisplay}
+                                    className="rounded-xl"
+                                    onClick={handleRecord}
+
                                 >
-                                    Filter
+                                    {isRecordingRef.current ? (
+                                        <CircleStop />
+                                    ) : (
+                                        <Circle fill="red" />
+                                    )}
                                 </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-50 p-4 mx-4 mb-2">
-                                <div className="flex flex-col max-h-80 overflow-y-auto">
-                                    <div className="flex items-center pb-2 ">
-                                        {/* Filter Name */}
-                                        <div className="text-sm font-semibold w-12"><ReplaceAll size={20} /></div>
-                                        {/* Buttons */}
-                                        <div className="flex space-x-2">
-                                            <div className="flex items-center border border-input rounded-xl mx-0 px-0">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => removeEXGFilterFromAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i))}
-                                                    className={`rounded-xl rounded-r-none border-0
-                        ${Object.keys(appliedEXGFiltersRef.current).length === 0
-                                                            ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    <CircleOff size={17} />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 4)}
-                                                    className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 4)
-                                                            ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    <BicepsFlexed size={17} />
-                                                </Button> <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 3)}
-                                                    className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 3)
-                                                            ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    <Brain size={17} />
-                                                </Button> <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 1)}
-                                                    className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 1)
-                                                            ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    <Heart size={17} />
-                                                </Button> <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 2)}
-                                                    className={`rounded-xl rounded-l-none border-0
-                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 2)
-                                                            ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    <Eye size={17} />
-                                                </Button>
-                                            </div>
-                                            <div className="flex border border-input rounded-xl items-center mx-0 px-0">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => removeNotchFromAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i))}
-                                                    className={`rounded-xl rounded-r-none border-0
-                          ${Object.keys(appliedFiltersRef.current).length === 0
-                                                            ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    <CircleOff size={17} />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => applyFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 1)}
-                                                    className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                          ${Object.keys(appliedFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedFiltersRef.current).every((value) => value === 1)
-                                                            ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    50Hz
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => applyFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 2)}
-                                                    className={`rounded-xl rounded-l-none border-0
-                          ${Object.keys(appliedFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedFiltersRef.current).every((value) => value === 2)
-                                                            ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                            : "bg-white-500" // Active background
-                                                        }`}
-                                                >
-                                                    60Hz
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col space-y-2">
-                                        {channelNames.map((filterName, index) => (
-                                            <div key={filterName} className="flex items-center">
-                                                {/* Filter Name */}
-                                                <div className="text-sm font-semibold w-12">{filterName}</div>
-                                                {/* Buttons */}
-                                                <div className="flex space-x-2">
-                                                    <div className="flex border border-input rounded-xl items-center mx-0 px-0">
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>
+                                    {!isRecordingRef.current
+                                        ? "Start Recording"
+                                        : "Stop Recording"}
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    {/* Save/Delete data buttons with tooltip */}
+                    <TooltipProvider>
+                        <div className="flex">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button className="rounded-xl p-4">
+                                        <FileArchive size={16} />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="p-4 text-base shadow-lg rounded-xl w-full">
+                                    <div className="space-y-4">
+                                        {/* List each file with download and delete actions */}
+                                        {datasets.length > 0 ? (
+                                            datasets.map((dataset) => (
+                                                <div key={dataset} className="flex justify-between items-center">
+                                                    {/* Display the filename directly */}
+                                                    <span className=" mr-4">
+                                                        {dataset}
+                                                    </span>
+
+                                                    <div className="flex space-x-2">
+                                                        {/* Save file by filename */}
                                                         <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => removeEXGFilter(index)}
-                                                            className={`rounded-xl rounded-r-none border-l-none border-0
-                                                        ${appliedEXGFiltersRef.current[index] === undefined
-                                                                    ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
+                                                            onClick={() => saveDataByFilename(dataset, canvasElementCountRef.current, selectedChannels)}
+                                                            className="rounded-xl px-4"
                                                         >
-                                                            <CircleOff size={17} />
+                                                            <Download size={16} />
                                                         </Button>
+
+                                                        {/* Delete file by filename */}
                                                         <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleFrequencySelectionEXG(index, 4)}
-                                                            className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                                                        ${appliedEXGFiltersRef.current[index] === 4
-                                                                    ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
+                                                            onClick={() => {
+                                                                deleteFileByFilename(dataset);
+                                                            }}
+                                                            className="rounded-xl px-4"
                                                         >
-                                                            <BicepsFlexed size={17} />
+                                                            <Trash2 size={16} />
                                                         </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleFrequencySelectionEXG(index, 3)}
-                                                            className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                                                      ${appliedEXGFiltersRef.current[index] === 3
-                                                                    ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
-                                                        >
-                                                            <Brain size={17} />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleFrequencySelectionEXG(index, 1)}
-                                                            className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                                                        ${appliedEXGFiltersRef.current[index] === 1
-                                                                    ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
-                                                        >
-                                                            <Heart size={17} />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleFrequencySelectionEXG(index, 2)}
-                                                            className={`rounded-xl rounded-l-none border-0
-                                                        ${appliedEXGFiltersRef.current[index] === 2
-                                                                    ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
-                                                        >
-                                                            <Eye size={17} />
-                                                        </Button>
-                                                    </div>
-                                                    <div className="flex border border-input rounded-xl items-center mx-0 px-0">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => removeNotchFilter(index)}
-                                                            className={`rounded-xl rounded-r-none border-0
-                                                        ${appliedFiltersRef.current[index] === undefined
-                                                                    ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
-                                                        >
-                                                            <CircleOff size={17} />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleFrequencySelection(index, 1)}
-                                                            className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
-                                                        ${appliedFiltersRef.current[index] === 1
-                                                                    ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
-                                                                    : "bg-white-500" // Active background
-                                                                }`}
-                                                        >
-                                                            50Hz
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleFrequencySelection(index, 2)}
-                                                            className={
-                                                                `rounded-xl rounded-l-none border-0 ${appliedFiltersRef.current[index] === 2
-                                                                    ? "bg-green-700 hover:bg-white-500 text-white hover:text-white "
-                                                                    : "bg-white-500 animate-fade-in-right"
-                                                                }`
-                                                            }
-                                                        >
-                                                            60Hz
-                                                        </Button>
+
                                                     </div>
                                                 </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-base ">No datasets available</p>
+                                        )}
+                                        {/* Download all as ZIP and delete all options */}
+                                        {datasets.length > 0 && (
+                                            <div className="flex justify-between mt-4">
+                                                <Button
+                                                    onClick={saveAllDataAsZip}
+                                                    className="rounded-xl p-2 w-full mr-2"
+                                                >
+                                                    Download All as Zip
+                                                </Button>
+                                                <Button
+                                                    onClick={deleteAllDataFromIndexedDB}
+                                                    className="rounded-xl p-2 w-full"
+                                                >
+                                                    Delete All
+                                                </Button>
                                             </div>
-                                        ))}
+                                        )}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </TooltipProvider>
+                    {/* filters */}
+                    <Popover
+                        open={isFilterPopoverOpen}
+                        onOpenChange={setIsFilterPopoverOpen}
+                    >
+                        <PopoverTrigger asChild>
+                            <Button
+                                className="flex items-center justify-center px-3 py-2 select-none min-w-12 whitespace-nowrap rounded-xl"
+                                disabled={!isDisplay}
+                            >
+                                Filter
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-50 p-4 mx-4 mb-2">
+                            <div className="flex flex-col max-h-80 overflow-y-auto">
+                                <div className="flex items-center pb-2 ">
+                                    {/* Filter Name */}
+                                    <div className="text-sm font-semibold w-12"><ReplaceAll size={20} /></div>
+                                    {/* Buttons */}
+                                    <div className="flex space-x-2">
+                                        <div className="flex items-center border border-input rounded-xl mx-0 px-0">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => removeEXGFilterFromAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i))}
+                                                className={`rounded-xl rounded-r-none border-0
+                        ${Object.keys(appliedEXGFiltersRef.current).length === 0
+                                                        ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                <CircleOff size={17} />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 4)}
+                                                className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 4)
+                                                        ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                <BicepsFlexed size={17} />
+                                            </Button> <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 3)}
+                                                className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 3)
+                                                        ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                <Brain size={17} />
+                                            </Button> <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 1)}
+                                                className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 1)
+                                                        ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                <Heart size={17} />
+                                            </Button> <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyEXGFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 2)}
+                                                className={`rounded-xl rounded-l-none border-0
+                        ${Object.keys(appliedEXGFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedEXGFiltersRef.current).every((value) => value === 2)
+                                                        ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                <Eye size={17} />
+                                            </Button>
+                                        </div>
+                                        <div className="flex border border-input rounded-xl items-center mx-0 px-0">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => removeNotchFromAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i))}
+                                                className={`rounded-xl rounded-r-none border-0
+                          ${Object.keys(appliedFiltersRef.current).length === 0
+                                                        ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                <CircleOff size={17} />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 1)}
+                                                className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                          ${Object.keys(appliedFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedFiltersRef.current).every((value) => value === 1)
+                                                        ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                50Hz
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyFilterToAllChannels(Array.from({ length: maxCanvasElementCountRef.current }, (_, i) => i), 2)}
+                                                className={`rounded-xl rounded-l-none border-0
+                          ${Object.keys(appliedFiltersRef.current).length === maxCanvasElementCountRef.current && Object.values(appliedFiltersRef.current).every((value) => value === 2)
+                                                        ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                        : "bg-white-500" // Active background
+                                                    }`}
+                                            >
+                                                60Hz
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
-                            </PopoverContent>
-                        </Popover>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button className="flex items-center justify-center select-none whitespace-nowrap rounded-lg">
-                                    <Settings size={16} />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[30rem] p-4 rounded-md shadow-md text-sm">
-                                <TooltipProvider>
-                                    <div className="space-y-6">
-                                        {/* Channel Selection */}
-                                        <div className="flex items-center justify-center rounded-lg mb-[2.5rem]">
-                                            <div className=" w-full">
-                                                <div className="absolute inset-0 rounded-lg border-gray-300 dark:border-gray-600 opacity-50 pointer-events-none"></div>
-                                                <div className="relative">
-                                                    {/* Heading and Select All Button */}
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <h3 className="text-xs font-semibold text-gray-500">
-                                                            <span className="font-bold text-gray-600">Channels Count:</span> {selectedChannels.length}
-                                                        </h3>
-                                                        {
-                                                            !(selectedChannels.length === maxCanvasElementCountRef.current && manuallySelected) && (
-                                                                <button
-                                                                    onClick={handleSelectAllToggle}
-                                                                    className={`px-4 py-1 text-xs font-light rounded-lg transition ${isSelectAllDisabled
-                                                                        ? "text-gray-400 bg-gray-200 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed"
-                                                                        : "text-white bg-black hover:bg-gray-700 dark:bg-white dark:text-black dark:border dark:border-gray-500 dark:hover:bg-primary/70"
-                                                                        }`}
-                                                                    disabled={isSelectAllDisabled}
-                                                                >
-                                                                    {isAllEnabledChannelSelected ? "RESET" : "Select All"}
-                                                                </button>
-                                                            )
+                                <div className="flex flex-col space-y-2">
+                                    {channelNames.map((filterName, index) => (
+                                        <div key={filterName} className="flex items-center">
+                                            {/* Filter Name */}
+                                            <div className="text-sm font-semibold w-12">{filterName}</div>
+                                            {/* Buttons */}
+                                            <div className="flex space-x-2">
+                                                <div className="flex border border-input rounded-xl items-center mx-0 px-0">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => removeEXGFilter(index)}
+                                                        className={`rounded-xl rounded-r-none border-l-none border-0
+                                                        ${appliedEXGFiltersRef.current[index] === undefined
+                                                                ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        <CircleOff size={17} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleFrequencySelectionEXG(index, 4)}
+                                                        className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                                                        ${appliedEXGFiltersRef.current[index] === 4
+                                                                ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        <BicepsFlexed size={17} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleFrequencySelectionEXG(index, 3)}
+                                                        className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                                                      ${appliedEXGFiltersRef.current[index] === 3
+                                                                ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        <Brain size={17} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleFrequencySelectionEXG(index, 1)}
+                                                        className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                                                        ${appliedEXGFiltersRef.current[index] === 1
+                                                                ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        <Heart size={17} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleFrequencySelectionEXG(index, 2)}
+                                                        className={`rounded-xl rounded-l-none border-0
+                                                        ${appliedEXGFiltersRef.current[index] === 2
+                                                                ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        <Eye size={17} />
+                                                    </Button>
+                                                </div>
+                                                <div className="flex border border-input rounded-xl items-center mx-0 px-0">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => removeNotchFilter(index)}
+                                                        className={`rounded-xl rounded-r-none border-0
+                                                        ${appliedFiltersRef.current[index] === undefined
+                                                                ? "bg-red-700 hover:bg-white-500 hover:text-white text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        <CircleOff size={17} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleFrequencySelection(index, 1)}
+                                                        className={`flex items-center justify-center px-3 py-2 rounded-none select-none border-0
+                                                        ${appliedFiltersRef.current[index] === 1
+                                                                ? "bg-green-700 hover:bg-white-500 text-white hover:text-white" // Disabled background
+                                                                : "bg-white-500" // Active background
+                                                            }`}
+                                                    >
+                                                        50Hz
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleFrequencySelection(index, 2)}
+                                                        className={
+                                                            `rounded-xl rounded-l-none border-0 ${appliedFiltersRef.current[index] === 2
+                                                                ? "bg-green-700 hover:bg-white-500 text-white hover:text-white "
+                                                                : "bg-white-500 animate-fade-in-right"
+                                                            }`
                                                         }
-                                                    </div>
-                                                    {/* Button Grid */}
-                                                    <div id="button-container" className="relative space-y-2 rounded-lg">
-                                                        {Array.from({ length: 1 }).map((_, container) => (
-                                                            <div key={container} className="grid grid-cols-8 gap-2">
-                                                                {Array.from({ length: 3 }).map((_, col) => {
-                                                                    const index = container * 8 + col;
-                                                                    const isChannelDisabled = index >= maxCanvasElementCountRef.current;
-                                                                    const isSelected = selectedChannels.includes(index + 1);
+                                                    >
+                                                        60Hz
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button className="flex items-center justify-center select-none whitespace-nowrap rounded-lg">
+                                <Settings size={16} />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[30rem] p-4 rounded-md shadow-md text-sm">
+                            <TooltipProvider>
+                                <div className="space-y-6">
+                                    {/* Channel Selection */}
+                                    <div className="flex items-center justify-center rounded-lg mb-[2.5rem]">
+                                        <div className=" w-full">
+                                            <div className="absolute inset-0 rounded-lg border-gray-300 dark:border-gray-600 opacity-50 pointer-events-none"></div>
+                                            <div className="relative">
+                                                {/* Heading and Select All Button */}
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-xs font-semibold text-gray-500">
+                                                        <span className="font-bold text-gray-600">Channels Count:</span> {selectedChannels.length}
+                                                    </h3>
+                                                    {
+                                                        !(selectedChannels.length === maxCanvasElementCountRef.current && manuallySelected) && (
+                                                            <button
+                                                                onClick={handleSelectAllToggle}
+                                                                className={`px-4 py-1 text-xs font-light rounded-lg transition ${isSelectAllDisabled
+                                                                    ? "text-gray-400 bg-gray-200 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed"
+                                                                    : "text-white bg-black hover:bg-gray-700 dark:bg-white dark:text-black dark:border dark:border-gray-500 dark:hover:bg-primary/70"
+                                                                    }`}
+                                                                disabled={isSelectAllDisabled}
+                                                            >
+                                                                {isAllEnabledChannelSelected ? "RESET" : "Select All"}
+                                                            </button>
+                                                        )
+                                                    }
+                                                </div>
+                                                {/* Button Grid */}
+                                                <div id="button-container" className="relative space-y-2 rounded-lg">
+                                                    {Array.from({ length: 1 }).map((_, container) => (
+                                                        <div key={container} className="grid grid-cols-8 gap-2">
+                                                            {Array.from({ length: 3 }).map((_, col) => {
+                                                                const index = container * 8 + col;
+                                                                const isChannelDisabled = index >= maxCanvasElementCountRef.current;
+                                                                const isSelected = selectedChannels.includes(index + 1);
 
-                                                                    // For selected channels, use the shared custom color.
-                                                                    // Otherwise, use default styles.
-                                                                    const buttonStyle = isChannelDisabled
-                                                                        ? isDarkModeEnabled
-                                                                            ? { backgroundColor: "#030c21", color: "gray" }
-                                                                            : { backgroundColor: "#e2e8f0", color: "gray" }
-                                                                        : isSelected
-                                                                            ? { backgroundColor: getCustomColor(index, activeTheme), color: "white" }
-                                                                            : { backgroundColor: "white", color: "black" };
+                                                                // For selected channels, use the shared custom color.
+                                                                // Otherwise, use default styles.
+                                                                const buttonStyle = isChannelDisabled
+                                                                    ? isDarkModeEnabled
+                                                                        ? { backgroundColor: "#030c21", color: "gray" }
+                                                                        : { backgroundColor: "#e2e8f0", color: "gray" }
+                                                                    : isSelected
+                                                                        ? { backgroundColor: getCustomColor(index, activeTheme), color: "white" }
+                                                                        : { backgroundColor: "white", color: "black" };
 
-                                                                    // Optional: calculate rounded corners based on button position.
-                                                                    const isFirstInRow = col === 0;
-                                                                    const isLastInRow = col === 7;
-                                                                    const isFirstContainer = container === 0;
-                                                                    const isLastContainer = container === 1;
-                                                                    const roundedClass = `
+                                                                // Optional: calculate rounded corners based on button position.
+                                                                const isFirstInRow = col === 0;
+                                                                const isLastInRow = col === 7;
+                                                                const isFirstContainer = container === 0;
+                                                                const isLastContainer = container === 1;
+                                                                const roundedClass = `
                                    ${isFirstInRow && isFirstContainer ? "rounded-tl-lg" : ""} 
                                    ${isLastInRow && isFirstContainer ? "rounded-tr-lg" : ""} 
                                    ${isFirstInRow && isLastContainer ? "rounded-bl-lg" : ""} 
                                    ${isLastInRow && isLastContainer ? "rounded-br-lg" : ""}
                                  `;
 
-                                                                    return (
-                                                                        <button
-                                                                            key={index}
-                                                                            onClick={() => !isChannelDisabled && toggleChannel(index + 1)}
-                                                                            disabled={isChannelDisabled}
-                                                                            style={buttonStyle}
-                                                                            className={`w-full h-8 text-xs font-medium py-1 border border-gray-300 dark:border-gray-600 transition-colors duration-200 ${roundedClass}`}
-                                                                        >
-                                                                            {`CH${index + 1}`}
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                                return (
+                                                                    <button
+                                                                        key={index}
+                                                                        onClick={() => !isChannelDisabled && toggleChannel(index + 1)}
+                                                                        disabled={isChannelDisabled}
+                                                                        style={buttonStyle}
+                                                                        className={`w-full h-8 text-xs font-medium py-1 border border-gray-300 dark:border-gray-600 transition-colors duration-200 ${roundedClass}`}
+                                                                    >
+                                                                        {`CH${index + 1}`}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Zoom Controls */}
-                                        <div className="relative w-full flex flex-col items-start text-sm mb-[2rem]">
-                                            <p className="absolute top-[-1.2rem] left-0 text-xs font-semibold text-gray-500">
-                                                <span className="font-bold text-gray-600">Zoom Level:</span> {Zoom}x
-                                            </p>
-                                            <div className="relative w-[28rem] flex items-center rounded-lg py-2 border border-gray-300 dark:border-gray-600 mb-4">
-                                                {/* Button for setting Zoom to 1 */}
-                                                <button
-                                                    className="text-gray-700 dark:text-gray-400 mx-1 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                    onClick={() => SetZoom(1)}
-                                                >
-                                                    1
-                                                </button>
+                                    {/* Zoom Controls */}
+                                    <div className="relative w-full flex flex-col items-start text-sm mb-[2rem]">
+                                        <p className="absolute top-[-1.2rem] left-0 text-xs font-semibold text-gray-500">
+                                            <span className="font-bold text-gray-600">Zoom Level:</span> {Zoom}x
+                                        </p>
+                                        <div className="relative w-[28rem] flex items-center rounded-lg py-2 border border-gray-300 dark:border-gray-600 mb-4">
+                                            {/* Button for setting Zoom to 1 */}
+                                            <button
+                                                className="text-gray-700 dark:text-gray-400 mx-1 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                onClick={() => SetZoom(1)}
+                                            >
+                                                1
+                                            </button>
 
-                                                <input
-                                                    type="range"
-                                                    min="1"
-                                                    max="10"
-                                                    value={Zoom}
-                                                    onChange={(e) => SetZoom(Number(e.target.value))}
-                                                    style={{
-                                                        background: `linear-gradient(to right, rgb(101, 136, 205) ${((Zoom - 1) / 9) * 100}%, rgb(165, 165, 165) ${((Zoom - 1) / 9) * 11}%)`,
-                                                    }}
-                                                    className="flex-1 h-[0.15rem] rounded-full appearance-none bg-gray-800 focus:outline-none focus:ring-0 slider-input"
-                                                />
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="10"
+                                                value={Zoom}
+                                                onChange={(e) => SetZoom(Number(e.target.value))}
+                                                style={{
+                                                    background: `linear-gradient(to right, rgb(101, 136, 205) ${((Zoom - 1) / 9) * 100}%, rgb(165, 165, 165) ${((Zoom - 1) / 9) * 11}%)`,
+                                                }}
+                                                className="flex-1 h-[0.15rem] rounded-full appearance-none bg-gray-800 focus:outline-none focus:ring-0 slider-input"
+                                            />
 
-                                                {/* Button for setting Zoom to 10 */}
-                                                <button
-                                                    className="text-gray-700 dark:text-gray-400 mx-2 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                    onClick={() => SetZoom(10)}
-                                                >
-                                                    10
-                                                </button>
-                                                <style jsx>{` input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 15px; height: 15px;
+                                            {/* Button for setting Zoom to 10 */}
+                                            <button
+                                                className="text-gray-700 dark:text-gray-400 mx-2 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                onClick={() => SetZoom(10)}
+                                            >
+                                                10
+                                            </button>
+                                            <style jsx>{` input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 15px; height: 15px;
                                                                  background-color: rgb(101, 136, 205); border-radius: 50%; cursor: pointer; } `}</style>
-                                            </div>
-                                        </div>
-
-                                        {/* Time-Base Selection */}
-                                        <div className="relative w-full flex flex-col items-start mt-3 text-sm">
-                                            <p className="absolute top-[-1.2rem] left-0 text-xs font-semibold text-gray-500">
-                                                <span className="font-bold text-gray-600">Time Base:</span> {timeBase} Seconds
-                                            </p>
-                                            <div className="relative w-[28rem] flex items-center rounded-lg py-2 border border-gray-300 dark:border-gray-600">
-                                                {/* Button for setting Time Base to 1 */}
-                                                <button
-                                                    className="text-gray-700 dark:text-gray-400 mx-1 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                    onClick={() => setTimeBase(1)}
-                                                >
-                                                    1
-                                                </button>
-                                                <input
-                                                    type="range"
-                                                    min="1"
-                                                    max="10"
-                                                    value={timeBase}
-                                                    onChange={(e) => setTimeBase(Number(e.target.value))}
-                                                    style={{
-                                                        background: `linear-gradient(to right, rgb(101, 136, 205) ${((timeBase - 1) / 9) * 100}%, rgb(165, 165, 165) ${((timeBase - 1) / 9) * 11}%)`,
-                                                    }}
-                                                    className="flex-1 h-[0.15rem] rounded-full appearance-none bg-gray-200 focus:outline-none focus:ring-0 slider-input"
-                                                />
-                                                {/* Button for setting Time Base to 10 */}
-                                                <button
-                                                    className="text-gray-700 dark:text-gray-400 mx-2 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                                                    onClick={() => setTimeBase(10)}
-                                                >
-                                                    10
-                                                </button>
-                                                <style jsx>{` input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none;appearance: none; width: 15px; height: 15px;
-                                                                  background-color: rgb(101, 136, 205); border-radius: 50%; cursor: pointer; }`}</style>
-                                            </div>
                                         </div>
                                     </div>
-                                </TooltipProvider>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+
+                                    {/* Time-Base Selection */}
+                                    <div className="relative w-full flex flex-col items-start mt-3 text-sm">
+                                        <p className="absolute top-[-1.2rem] left-0 text-xs font-semibold text-gray-500">
+                                            <span className="font-bold text-gray-600">Time Base:</span> {timeBase} Seconds
+                                        </p>
+                                        <div className="relative w-[28rem] flex items-center rounded-lg py-2 border border-gray-300 dark:border-gray-600">
+                                            {/* Button for setting Time Base to 1 */}
+                                            <button
+                                                className="text-gray-700 dark:text-gray-400 mx-1 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                onClick={() => setTimeBase(1)}
+                                            >
+                                                1
+                                            </button>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="10"
+                                                value={timeBase}
+                                                onChange={(e) => setTimeBase(Number(e.target.value))}
+                                                style={{
+                                                    background: `linear-gradient(to right, rgb(101, 136, 205) ${((timeBase - 1) / 9) * 100}%, rgb(165, 165, 165) ${((timeBase - 1) / 9) * 11}%)`,
+                                                }}
+                                                className="flex-1 h-[0.15rem] rounded-full appearance-none bg-gray-200 focus:outline-none focus:ring-0 slider-input"
+                                            />
+                                            {/* Button for setting Time Base to 10 */}
+                                            <button
+                                                className="text-gray-700 dark:text-gray-400 mx-2 px-2 py-1 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                onClick={() => setTimeBase(10)}
+                                            >
+                                                10
+                                            </button>
+                                            <style jsx>{` input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none;appearance: none; width: 15px; height: 15px;
+                                                                  background-color: rgb(101, 136, 205); border-radius: 50%; cursor: pointer; }`}</style>
+                                        </div>
+                                    </div>
+                                </div>
+                            </TooltipProvider>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             </div>
+        </div>
     );
 
 }
