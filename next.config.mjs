@@ -1,7 +1,10 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import withPWA from "next-pwa";
+
+const nextConfig = withPWA({
   reactStrictMode: true,
-  output: 'export',  // This is key for static export
+  output: "export",  // Ensures it works with static export
+  basePath: "/Chords-Web",
+  assetPrefix: "/Chords-Web",
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -11,6 +14,12 @@ const nextConfig = {
       },
     ],
   },
-};
-/* module.exports = nextConfig*/
+  pwa: {
+    dest: "public",
+    register: true,
+    skipWaiting: true,
+  },
+});
+
 export default nextConfig;
+
