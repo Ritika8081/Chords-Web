@@ -6,7 +6,6 @@ const withPWA = nextPwa({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  buildExcludes: [/manifest\.json$/],  // Prevent deletion during export
 });
 
 const config = {
@@ -25,3 +24,5 @@ const config = {
 };
 
 export default config;
+
+
