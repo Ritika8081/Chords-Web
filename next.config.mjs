@@ -1,10 +1,17 @@
-import withPWA from "next-pwa";
 
-const nextConfig = withPWA({
+import nextPwa from 'next-pwa';
+
+/** @type {import('next').NextConfig} */
+const withPWA = nextPwa({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  buildExcludes: [/manifest\.json$/],  // Prevent deletion during export
+});
+
+const config = {
   reactStrictMode: true,
   output: "export",  // Ensures it works with static export
-  basePath: "/Chords-Web",
-  assetPrefix: "/Chords-Web",
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -14,12 +21,7 @@ const nextConfig = withPWA({
       },
     ],
   },
-  pwa: {
-    dest: "public",
-    register: true,
-    skipWaiting: true,
-  },
-});
+  ...withPWA,
+};
 
-export default nextConfig;
-
+export default config;
