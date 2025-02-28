@@ -16,8 +16,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Chords",
   description: "Web Serial based Biopotential Signal recorder application.",
-  themeColor: "#007bff",
-  manifest: "/manifest.json", // ✅ Add this line to register the manifest
+  manifest: "/Chords-Web/manifest.json", // ✅ Add this line to register the manifest
 };
 
 const lobsterTwo = Lobster_Two({
@@ -46,8 +45,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="manifest" href="/manifest.json" /> {/* ✅ Added manifest */}
-        <meta name="theme-color" content="#007bff" /> {/* ✅ Added theme color */}
+        <link rel="manifest" href="/Chords-Web/manifest.json" /> {/* ✅ Added manifest */}
       </head>
       <body
         className={cn(
