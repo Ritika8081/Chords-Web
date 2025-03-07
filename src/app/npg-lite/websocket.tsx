@@ -324,195 +324,162 @@ const Websocket = () => {
         zoomRef.current = Zoom;
     }, [Zoom]);
 
- 
+    const sendData = useCallback(
+        (ws: WebSocket, blockSize: number, startTime: number, allData: number[][]) => {
+            let dataSize = 0,
+                sampleSize = 0,
+                packetSize = 0;
+            let previousSampleNumber = -1;
+            let counter = 0;
+            setInterval(() => {
+                const currentTime = Date.now();
+                const elapsedTime = (currentTime - startTime) / 1000;
+                if (elapsedTime >= 1.0) {
+                    console.log(
+                        `FPS: ${Math.ceil(packetSize / elapsedTime)} SPS: ${Math.ceil(
+                            sampleSize / elapsedTime
+                        )} BPS: ${Math.ceil(dataSize / elapsedTime)}`
+                    );
+                    if (Math.ceil(packetSize / elapsedTime) == 0) {
+                        checkref.current++;
+                        console.log(checkref.current);
+                        if (checkref.current == 3) {
+                            setIsConnected(false);
+                            console.log("yes");
+                        }
+                        if (checkref.current == 4) {
+                            console.log("no");
+                            disconnect();
+                        }
+                    }
+
+                    packetSize = 0;
+                    sampleSize = 0;
+                    dataSize = 0;
+                    startTime = currentTime;
+                }
+            }, 1000);
+
+            const notchFilters = Array.from(
+                { length: maxCanvasElementCountRef.current },
+                () => new Notch()
+            );
+            const EXGFilters = Array.from(
+                { length: maxCanvasElementCountRef.current },
+                () => new EXGFilter()
+            );
+
+            notchFilters.forEach((filter) => {
+                filter.setbits(sampingrateref.current);
+            });
+            EXGFilters.forEach((filter) => {
+                filter.setbits("12", sampingrateref.current);
+            });
+
+            ws.onmessage = (event) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                    dataSize += data.byteLength;
+                    packetSize++;
+
+                    const channelDataBuffer = Array.from({ length: numChannels }, () => [] as number[]);
+
+                    for (let blockLocation = 0; blockLocation < data.length; blockLocation += blockSize) {
+                        if (blockLocation + blockSize > data.length) break;
+                        const block = data.subarray(blockLocation, blockLocation + blockSize);
+                        const sampleNumber = block[0];
+                        sampleSize++;
+                        let channelData: number[] = [];
+                        channelData.push(counter);
+
+                        for (let channel = 0; channel < numChannels; channel++) {
+                            const sample = (block[1 + channel * 2] << 8) | block[2 + channel * 2];
+                            channelDataBuffer[channel].push(sample);
+                            allData[channel].push(sample);
+                            channelData.push(
+                                notchFilters[channel].process(
+                                    EXGFilters[channel].process(sample, appliedEXGFiltersRef.current[channel]),
+                                    appliedFiltersRef.current[channel]
+                                )
+                            );
+                        }
+                        counter = (counter + 1) % 256;
+                        updatePlots(channelData, zoomRef.current);
+                        previousSampleNumber = sampleNumber;
+                        if (isRecordingRef.current) {
+                            const channeldatavalues = channelData
+                                .slice(0, canvasElementCountRef.current + 1)
+                                .map((value) => (value !== undefined ? value : null))
+                                .filter((value): value is number => value !== null);
+
+                            recordingBuffers[activeBufferIndex][fillingindex.current] = channeldatavalues;
+                            if (fillingindex.current >= MAX_BUFFER_SIZE - 1) {
+                                processBuffer(activeBufferIndex, canvasElementCountRef.current, selectedChannels);
+                                activeBufferIndex = (activeBufferIndex + 1) % NUM_BUFFERS;
+                            }
+                            fillingindex.current = (fillingindex.current + 1) % MAX_BUFFER_SIZE;
+
+                            const elapsedTime = Date.now() - recordingStartTimeRef.current;
+                            setRecordingElapsedTime((prev) => {
+                                if (endTimeRef.current !== null && elapsedTime >= endTimeRef.current) {
+                                    stopRecording();
+                                    return endTimeRef.current;
+                                }
+                                return elapsedTime;
+                            });
+                        }
+                    }
+                };
+                reader.readAsArrayBuffer(event.data);
+            };
+        },
+        [
+            Zoom, zoomRef.current, checkref.current
+        ]
+    );
+
 
     const wsRef = useRef<WebSocket | null>(null);
     const [manualDisconnect, setManualDisconnect] = useState(false);
 
-    // const connect = () => {
-    //     checkref.current = 0;
-    //     setManualDisconnect(false);
-    //     setIsLoading(true);
-    //     const allData = Array.from({ length: numChannels }, () => [] as number[]);
-    //     const blockSize = 13;
-    //     setIsLoading(true);
-
-    //     wsRef.current = new WebSocket("ws://multi-emg.local:81");
-
-    //     wsRef.current.onopen = () => {
-    //         console.log("Connected to WebSocket");
-    //         if (
-    //             wsRef.current) sendData(
-    //                 wsRef.current, blockSize, Date.now(), allData); // Ensure ws is not null
-    //         setIsLoading(false);
-    //         setIsConnected(true);
-
-    //     };
-
-    //     wsRef.current.onerror = (error) => {
-    //         console.error("WebSocket Error: ", error);
-    //     };
-
-    //     wsRef.current.onclose = () => {
-    //         console.log("WebSocket connection closed");
-
-    //         if (!manualDisconnect) {
-    //             setIsConnected(false);
-    //             setIsLoading(true);
-
-
-    //         }
-    //     };
-    // };
-
-
-
-
-
-
-  const DEVICE_NAME = "ESP32_BLE_Device";
-  const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-  const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-  const CONTROL_CHAR_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
-  
-  const SINGLE_SAMPLE_LEN = 10; // Each sample is 10 bytes
-  const BLOCK_COUNT = 10; // 10 samples batched per notification
-  const NEW_PACKET_LEN = SINGLE_SAMPLE_LEN * BLOCK_COUNT; // 100 bytes
-  
-  let prevSampleCounter: number | null = null;
-  let samplesReceived = 0;
-  let channelData: number[] = [];
-  const notchFilters = Array.from(
-    { length: maxCanvasElementCountRef.current },
-    () => new Notch()
-);
-const EXGFilters = Array.from(
-    { length: maxCanvasElementCountRef.current },
-    () => new EXGFilter()
-);
-
-notchFilters.forEach((filter) => {
-    filter.setbits(sampingrateref.current);
-});
-EXGFilters.forEach((filter) => {
-    filter.setbits("12", sampingrateref.current);
-});
-  function processSample(dataView: DataView): void {
-    if (dataView.byteLength !== SINGLE_SAMPLE_LEN) {
-      console.log("Unexpected sample length: " + dataView.byteLength);
-      return;
-    }
-  
-    const sync1 = dataView.getUint8(0);
-    const sync2 = dataView.getUint8(1);
-    const sampleCounter = dataView.getUint8(2);
-    const endByte = dataView.getUint8(9);
-  
-    if (sync1 !== 0xC7 || sync2 !== 0x7C || endByte !== 0x01) {
-      console.log(`Invalid sample header/footer: ${sync1} ${sync2} ${endByte}`);
-      return;
-    }
-  
-    if (prevSampleCounter === null) {
-      prevSampleCounter = sampleCounter;
-    } else {
-      const expected = (prevSampleCounter + 1) % 256;
-      if (sampleCounter !== expected) {
-        console.log(`Missing sample: expected ${expected}, got ${sampleCounter}`);
-      }
-      prevSampleCounter = sampleCounter;
-    }
-    channelData.push(dataView.getUint8(2));
-
-    for (let channel = 0; channel < numChannels; channel++) {
-        const sample = dataView.getInt16(3+(channel*2), false);;
-        channelData.push(
-            notchFilters[channel].process(
-                EXGFilters[channel].process(sample, appliedEXGFiltersRef.current[channel]),
-                appliedFiltersRef.current[channel]
-            )
-        );
-    }
-  
-    updatePlots(channelData, zoomRef.current);
-channelData=[];
-    samplesReceived++;
-  }
-  
-  interface BluetoothRemoteGATTCharacteristicExtended extends EventTarget {
-    value?: DataView;
-  }
-  
-  function handleNotification(event: Event): void {
-    const target = event.target as BluetoothRemoteGATTCharacteristicExtended;
-    if (!target.value) {
-      console.log("Received event with no value.");
-      return;
-    }
-    const value = target.value;
-    if (value.byteLength === NEW_PACKET_LEN) {
-      for (let i = 0; i < NEW_PACKET_LEN; i += SINGLE_SAMPLE_LEN) {
-        const sampleBuffer = value.buffer.slice(i, i + SINGLE_SAMPLE_LEN);
-        const sampleDataView = new DataView(sampleBuffer);
-        processSample(sampleDataView);
-      }
-    } else if (value.byteLength === SINGLE_SAMPLE_LEN) {
-      processSample(new DataView(value.buffer));
-    } else {
-      console.log("Unexpected packet length: " + value.byteLength);
-    }
-  }
-  
-  async function connectBLE(): Promise<void> {
-    try {
+    const connect = () => {
+        checkref.current = 0;
+        setManualDisconnect(false);
         setIsLoading(true);
-      const nav = navigator as any;
-      if (!nav.bluetooth) {
-        console.log("Web Bluetooth API is not available in this browser.");
-        return;
-      }
-      console.log("Requesting Bluetooth device...");
-      const device = await nav.bluetooth.requestDevice({
-        filters: [{ name: DEVICE_NAME }],
-        optionalServices: [SERVICE_UUID],
-      });
-  
-      console.log("Connecting to GATT Server...");
-      const server = await device.gatt?.connect();
-      if (!server) {
-        console.log("Failed to connect to GATT Server.");
-        return;
-      }
-  
-      console.log("Getting Service...");
-      const service = await server.getPrimaryService(SERVICE_UUID);
-  
-      console.log("Getting Control Characteristic...");
-      const controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
-      console.log("Getting Data Characteristic...");
-      const dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
-  
-      console.log("Sending START command...");
-      const encoder = new TextEncoder();
-      await controlChar.writeValue(encoder.encode("START"));
-  
-      console.log("Starting notifications...");
-      await dataChar.startNotifications();
-      dataChar.addEventListener("characteristicvaluechanged", handleNotification);
-      setIsLoading(false);
-      setIsConnected(true);
+        const allData = Array.from({ length: numChannels }, () => [] as number[]);
+        const blockSize = 13;
+        setIsLoading(true);
 
-      console.log("Notifications started. Listening for data...");
-  
-      setInterval(() => {
-        console.log("Samples per second: " + samplesReceived);
-        samplesReceived = 0;
-      }, 1000);
-    } catch (error) {
-      console.log("Error: " + (error instanceof Error ? error.message : error));
-    }
-  }
-  
+        wsRef.current = new WebSocket("ws://multi-emg.local:81");
+
+        wsRef.current.onopen = () => {
+            console.log("Connected to WebSocket");
+            if (
+                wsRef.current) sendData(
+                    wsRef.current, blockSize, Date.now(), allData); // Ensure ws is not null
+            setIsLoading(false);
+            setIsConnected(true);
+
+        };
+
+        wsRef.current.onerror = (error) => {
+            console.error("WebSocket Error: ", error);
+        };
+
+        wsRef.current.onclose = () => {
+            console.log("WebSocket connection closed");
+
+            if (!manualDisconnect) {
+                setIsConnected(false);
+                setIsLoading(true);
+
+
+            }
+        };
+    };
+
+
 
     const disconnect = () => {
         setManualDisconnect(true);
@@ -845,7 +812,6 @@ channelData=[];
                     console.warn(`WebglPlot instance at index ${index} is undefined.`);
                 }
             });
-            console.log(data);
             linesRef.current.forEach((line, i) => {
                 if (!line) {
                     console.warn(`Line at index ${i} is undefined.`);
@@ -1016,7 +982,7 @@ channelData=[];
                                     <PopoverTrigger asChild>
                                         <Button
                                             className="flex items-center gap-1 py-2 px-4 rounded-xl font-semibold"
-                                            onClick={() => (isConnected ? disconnect() : connectBLE())}
+                                            onClick={() => (isConnected ? disconnect() : connect())}
                                             disabled={isLoading}
                                         >
                                             {isLoading ? (
