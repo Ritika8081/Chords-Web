@@ -264,7 +264,6 @@ const Websocket = () => {
     const removeEXGFilter = (channelIndex: number) => {
         delete appliedEXGFiltersRef.current[channelIndex]; // Remove the filter for the channel
         forceEXGUpdate(); // Trigger re-render
-
     };
 
     // Function to handle frequency selection
