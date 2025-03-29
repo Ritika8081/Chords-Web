@@ -368,16 +368,16 @@ const Websocket = () => {
 
 
 
-
-
-  const DEVICE_NAME = "ESP32_BLE_Device";
-  const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-  const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-  const CONTROL_CHAR_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
+    const DEVICE_NAME = "NPG";
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const CONTROL_CHAR_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
   
-  const SINGLE_SAMPLE_LEN = 10; // Each sample is 10 bytes
+   const SINGLE_SAMPLE_LEN = 7; // Each sample is 10 bytes
   const BLOCK_COUNT = 10; // 10 samples batched per notification
   const NEW_PACKET_LEN = SINGLE_SAMPLE_LEN * BLOCK_COUNT; // 100 bytes
+
+
   
   let prevSampleCounter: number | null = null;
   let samplesReceived = 0;
@@ -403,15 +403,15 @@ EXGFilters.forEach((filter) => {
       return;
     }
   
-    const sync1 = dataView.getUint8(0);
-    const sync2 = dataView.getUint8(1);
+    // const sync1 = dataView.getUint8(0);
+    // const sync2 = dataView.getUint8(1);
     const sampleCounter = dataView.getUint8(2);
-    const endByte = dataView.getUint8(9);
+    // const endByte = dataView.getUint8(9);
   
-    if (sync1 !== 0xC7 || sync2 !== 0x7C || endByte !== 0x01) {
-      console.log(`Invalid sample header/footer: ${sync1} ${sync2} ${endByte}`);
-      return;
-    }
+    // if (sync1 !== 0xC7 || sync2 !== 0x7C || endByte !== 0x01) {
+    //   console.log(`Invalid sample header/footer: ${sync1} ${sync2} ${endByte}`);
+    //   return;
+    // }
   
     if (prevSampleCounter === null) {
       prevSampleCounter = sampleCounter;
@@ -425,7 +425,7 @@ EXGFilters.forEach((filter) => {
     channelData.push(dataView.getUint8(2));
 
     for (let channel = 0; channel < numChannels; channel++) {
-        const sample = dataView.getInt16(3+(channel*2), false);;
+        const sample = dataView.getInt16(1+(channel*2), false);;
         channelData.push(
             notchFilters[channel].process(
                 EXGFilters[channel].process(sample, appliedEXGFiltersRef.current[channel]),
@@ -473,10 +473,9 @@ channelData=[];
       }
       console.log("Requesting Bluetooth device...");
       const device = await nav.bluetooth.requestDevice({
-        filters: [{ name: DEVICE_NAME }],
+        filters: [{ namePrefix: DEVICE_NAME }],
         optionalServices: [SERVICE_UUID],
       });
-  
       console.log("Connecting to GATT Server...");
       const server = await device.gatt?.connect();
       if (!server) {
