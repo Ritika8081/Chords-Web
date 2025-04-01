@@ -141,7 +141,7 @@ const Websocket = () => {
         const opacityLightMajor = "0.4";
         const opacityLightMinor = "0.1";
         const distanceminor = sampingrateref.current * 0.04;
-        const numGridLines = (500* 4) / distanceminor;
+        const numGridLines = (500 * 4) / distanceminor;
 
         for (let j = 1; j < numGridLines; j++) {
             const gridLineX = document.createElement("div");
@@ -324,7 +324,7 @@ const Websocket = () => {
         zoomRef.current = Zoom;
     }, [Zoom]);
 
- 
+
 
     const wsRef = useRef<WebSocket | null>(null);
     const [manualDisconnect, setManualDisconnect] = useState(false);
@@ -372,146 +372,147 @@ const Websocket = () => {
     const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
     const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
     const CONTROL_CHAR_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
-  
-   const SINGLE_SAMPLE_LEN = 7; // Each sample is 10 bytes
-  const BLOCK_COUNT = 10; // 10 samples batched per notification
-  const NEW_PACKET_LEN = SINGLE_SAMPLE_LEN * BLOCK_COUNT; // 100 bytes
+
+    const SINGLE_SAMPLE_LEN = 7; // Each sample is 10 bytes
+    const BLOCK_COUNT = 10; // 10 samples batched per notification
+    const NEW_PACKET_LEN = SINGLE_SAMPLE_LEN * BLOCK_COUNT; // 100 bytes
 
 
-  
-  let prevSampleCounter: number | null = null;
-  let samplesReceived = 0;
-  let channelData: number[] = [];
-  const notchFilters = Array.from(
-    { length: maxCanvasElementCountRef.current },
-    () => new Notch()
-);
-const EXGFilters = Array.from(
-    { length: maxCanvasElementCountRef.current },
-    () => new EXGFilter()
-);
 
-notchFilters.forEach((filter) => {
-    filter.setbits(sampingrateref.current);
-});
-EXGFilters.forEach((filter) => {
-    filter.setbits("12", sampingrateref.current);
-});
-  function processSample(dataView: DataView): void {
-    if (dataView.byteLength !== SINGLE_SAMPLE_LEN) {
-      console.log("Unexpected sample length: " + dataView.byteLength);
-      return;
-    }
-  
-    // const sync1 = dataView.getUint8(0);
-    // const sync2 = dataView.getUint8(1);
-    const sampleCounter = dataView.getUint8(2);
-    // const endByte = dataView.getUint8(9);
-  
-    // if (sync1 !== 0xC7 || sync2 !== 0x7C || endByte !== 0x01) {
-    //   console.log(`Invalid sample header/footer: ${sync1} ${sync2} ${endByte}`);
-    //   return;
-    // }
-  
-    if (prevSampleCounter === null) {
-      prevSampleCounter = sampleCounter;
-    } else {
-      const expected = (prevSampleCounter + 1) % 256;
-      if (sampleCounter !== expected) {
-        console.log(`Missing sample: expected ${expected}, got ${sampleCounter}`);
-      }
-      prevSampleCounter = sampleCounter;
-    }
-    channelData.push(dataView.getUint8(2));
+    let prevSampleCounter: number | null = null;
+    let samplesReceived = 0;
+    let channelData: number[] = [];
+    const notchFilters = Array.from(
+        { length: maxCanvasElementCountRef.current },
+        () => new Notch()
+    );
+    const EXGFilters = Array.from(
+        { length: maxCanvasElementCountRef.current },
+        () => new EXGFilter()
+    );
 
-    for (let channel = 0; channel < numChannels; channel++) {
-        const sample = dataView.getInt16(1+(channel*2), false);;
-        channelData.push(
-            notchFilters[channel].process(
-                EXGFilters[channel].process(sample, appliedEXGFiltersRef.current[channel]),
-                appliedFiltersRef.current[channel]
-            )
-        );
-    }
-  
-    updatePlots(channelData, zoomRef.current);
-channelData=[];
-    samplesReceived++;
-  }
-  
-  interface BluetoothRemoteGATTCharacteristicExtended extends EventTarget {
-    value?: DataView;
-  }
-  
-  function handleNotification(event: Event): void {
-    const target = event.target as BluetoothRemoteGATTCharacteristicExtended;
-    if (!target.value) {
-      console.log("Received event with no value.");
-      return;
-    }
-    const value = target.value;
-    if (value.byteLength === NEW_PACKET_LEN) {
-      for (let i = 0; i < NEW_PACKET_LEN; i += SINGLE_SAMPLE_LEN) {
-        const sampleBuffer = value.buffer.slice(i, i + SINGLE_SAMPLE_LEN);
-        const sampleDataView = new DataView(sampleBuffer);
-        processSample(sampleDataView);
-      }
-    } else if (value.byteLength === SINGLE_SAMPLE_LEN) {
-      processSample(new DataView(value.buffer));
-    } else {
-      console.log("Unexpected packet length: " + value.byteLength);
-    }
-  }
-  
-  async function connectBLE(): Promise<void> {
-    try {
-        setIsLoading(true);
-      const nav = navigator as any;
-      if (!nav.bluetooth) {
-        console.log("Web Bluetooth API is not available in this browser.");
-        return;
-      }
-      console.log("Requesting Bluetooth device...");
-      const device = await nav.bluetooth.requestDevice({
-        filters: [{ namePrefix: DEVICE_NAME }],
-        optionalServices: [SERVICE_UUID],
-      });
-      console.log("Connecting to GATT Server...");
-      const server = await device.gatt?.connect();
-      if (!server) {
-        console.log("Failed to connect to GATT Server.");
-        return;
-      }
-  
-      console.log("Getting Service...");
-      const service = await server.getPrimaryService(SERVICE_UUID);
-  
-      console.log("Getting Control Characteristic...");
-      const controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
-      console.log("Getting Data Characteristic...");
-      const dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
-  
-      console.log("Sending START command...");
-      const encoder = new TextEncoder();
-      await controlChar.writeValue(encoder.encode("START"));
-  
-      console.log("Starting notifications...");
-      await dataChar.startNotifications();
-      dataChar.addEventListener("characteristicvaluechanged", handleNotification);
-      setIsLoading(false);
-      setIsConnected(true);
+    notchFilters.forEach((filter) => {
+        filter.setbits(sampingrateref.current);
+    });
+    EXGFilters.forEach((filter) => {
+        filter.setbits("12", sampingrateref.current);
+    });
 
-      console.log("Notifications started. Listening for data...");
-  
-      setInterval(() => {
-        console.log("Samples per second: " + samplesReceived);
-        samplesReceived = 0;
-      }, 1000);
-    } catch (error) {
-      console.log("Error: " + (error instanceof Error ? error.message : error));
+    function processSample(dataView: DataView): void {
+        if (dataView.byteLength !== SINGLE_SAMPLE_LEN) {
+            console.log("Unexpected sample length: " + dataView.byteLength);
+            return;
+        }
+
+        // const sync1 = dataView.getUint8(0);
+        // const sync2 = dataView.getUint8(1);
+        const sampleCounter = dataView.getUint8(0);
+        // const endByte = dataView.getUint8(9);
+
+        // if (sync1 !== 0xC7 || sync2 !== 0x7C || endByte !== 0x01) {
+        //   console.log(`Invalid sample header/footer: ${sync1} ${sync2} ${endByte}`);
+        //   return;
+        // }
+
+        if (prevSampleCounter === null) {
+          prevSampleCounter = sampleCounter;
+        } else {
+          const expected = (prevSampleCounter + 1) % 256;
+          if (sampleCounter !== expected) {
+            console.log(`Missing sample: expected ${expected}, got ${sampleCounter}`);
+          }
+          prevSampleCounter = sampleCounter;
+        }
+        channelData.push(sampleCounter);
+
+        for (let channel = 0; channel < numChannels; channel++) {
+            const sample = dataView.getInt16(1 + (channel * 2), false);;
+            channelData.push(
+                notchFilters[channel].process(
+                    EXGFilters[channel].process(sample, appliedEXGFiltersRef.current[channel]),
+                    appliedFiltersRef.current[channel]
+                )
+            );
+        }
+
+        updatePlots(channelData, zoomRef.current);
+        channelData = [];
+        samplesReceived++;
     }
-  }
-  
+
+    interface BluetoothRemoteGATTCharacteristicExtended extends EventTarget {
+        value?: DataView;
+    }
+
+    function handleNotification(event: Event): void {
+        const target = event.target as BluetoothRemoteGATTCharacteristicExtended;
+        if (!target.value) {
+            console.log("Received event with no value.");
+            return;
+        }
+        const value = target.value;
+        if (value.byteLength === NEW_PACKET_LEN) {
+            for (let i = 0; i < NEW_PACKET_LEN; i += SINGLE_SAMPLE_LEN) {
+                const sampleBuffer = value.buffer.slice(i, i + SINGLE_SAMPLE_LEN);
+                const sampleDataView = new DataView(sampleBuffer);
+                processSample(sampleDataView);
+            }
+        } else if (value.byteLength === SINGLE_SAMPLE_LEN) {
+            processSample(new DataView(value.buffer));
+        } else {
+            console.log("Unexpected packet length: " + value.byteLength);
+        }
+    }
+
+    async function connectBLE(): Promise<void> {
+        try {
+            setIsLoading(true);
+            const nav = navigator as any;
+            if (!nav.bluetooth) {
+                console.log("Web Bluetooth API is not available in this browser.");
+                return;
+            }
+            console.log("Requesting Bluetooth device...");
+            const device = await nav.bluetooth.requestDevice({
+                filters: [{ namePrefix: "NPG" }],
+                optionalServices: [SERVICE_UUID],
+            });
+            console.log("Connecting to GATT Server...");
+            const server = await device.gatt?.connect();
+            if (!server) {
+                console.log("Failed to connect to GATT Server.");
+                return;
+            }
+
+            console.log("Getting Service...");
+            const service = await server.getPrimaryService(SERVICE_UUID);
+
+            console.log("Getting Control Characteristic...");
+            const controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
+            console.log("Getting Data Characteristic...");
+            const dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
+
+            console.log("Sending START command...");
+            const encoder = new TextEncoder();
+            await controlChar.writeValue(encoder.encode("START"));
+
+            console.log("Starting notifications...");
+            await dataChar.startNotifications();
+            dataChar.addEventListener("characteristicvaluechanged", handleNotification);
+            setIsLoading(false);
+            setIsConnected(true);
+
+            console.log("Notifications started. Listening for data...");
+
+            setInterval(() => {
+                console.log("Samples per second: " + samplesReceived);
+                samplesReceived = 0;
+            }, 1000);
+        } catch (error) {
+            console.log("Error: " + (error instanceof Error ? error.message : error));
+        }
+    }
+
 
     const disconnect = () => {
         setManualDisconnect(true);
@@ -844,7 +845,6 @@ channelData=[];
                     console.warn(`WebglPlot instance at index ${index} is undefined.`);
                 }
             });
-            console.log(data);
             linesRef.current.forEach((line, i) => {
                 if (!line) {
                     console.warn(`Line at index ${i} is undefined.`);
