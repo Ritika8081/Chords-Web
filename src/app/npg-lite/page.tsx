@@ -329,45 +329,6 @@ const Websocket = () => {
     const wsRef = useRef<WebSocket | null>(null);
     const [manualDisconnect, setManualDisconnect] = useState(false);
 
-    // const connect = () => {
-    //     checkref.current = 0;
-    //     setManualDisconnect(false);
-    //     setIsLoading(true);
-    //     const allData = Array.from({ length: numChannels }, () => [] as number[]);
-    //     const blockSize = 13;
-    //     setIsLoading(true);
-
-    //     wsRef.current = new WebSocket("ws://multi-emg.local:81");
-
-    //     wsRef.current.onopen = () => {
-    //         console.log("Connected to WebSocket");
-    //         if (
-    //             wsRef.current) sendData(
-    //                 wsRef.current, blockSize, Date.now(), allData); // Ensure ws is not null
-    //         setIsLoading(false);
-    //         setIsConnected(true);
-
-    //     };
-
-    //     wsRef.current.onerror = (error) => {
-    //         console.error("WebSocket Error: ", error);
-    //     };
-
-    //     wsRef.current.onclose = () => {
-    //         console.log("WebSocket connection closed");
-
-    //         if (!manualDisconnect) {
-    //             setIsConnected(false);
-    //             setIsLoading(true);
-
-
-    //         }
-    //     };
-    // };
-
-
-
-
     const DEVICE_NAME = "NPG";
     const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
     const DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
@@ -404,15 +365,9 @@ const Websocket = () => {
             return;
         }
 
-        // const sync1 = dataView.getUint8(0);
-        // const sync2 = dataView.getUint8(1);
-        const sampleCounter = dataView.getUint8(0);
-        // const endByte = dataView.getUint8(9);
 
-        // if (sync1 !== 0xC7 || sync2 !== 0x7C || endByte !== 0x01) {
-        //   console.log(`Invalid sample header/footer: ${sync1} ${sync2} ${endByte}`);
-        //   return;
-        // }
+        const sampleCounter = dataView.getUint8(0);
+
 
         if (prevSampleCounter === null) {
           prevSampleCounter = sampleCounter;
