@@ -1344,28 +1344,14 @@ const Connection: React.FC<ConnectionProps> = ({
                                         Serial Wizard
                                     </Button>
                                 )}
-                                {!isDeviceConnected && (
+                                     {!isDeviceConnected && (
                                     <Button
-                                        className="flex items-center gap-1 py-2 px-4 rounded-xl font-semibold"
-                                        onClick={() => (isDeviceConnected ? disconnectDevice() : connectToDevicefft())}
-                                        disabled={isfftLoading}
+                                        className="py-2 px-4 rounded-xl font-semibold"
+                                        onClick={() => {
+                                            router.push("/npg-lite");
+                                        }}
                                     >
-                                        {isfftLoading ? (
-                                            <>
-                                                <Loader size={17} className="animate-spin" />
-                                                Connecting...
-                                            </>
-                                        ) : isDeviceConnected ? (
-                                            <>
-                                                Disconnect
-                                                <CircleX size={17} />
-                                            </>
-                                        ) : (
-                                            <>
-                                                FFT Visualizer
-                                                <Cable size={17} />
-                                            </>
-                                        )}
+                                       NPG-Lite
                                     </Button>
                                 )}
                             </Popover>
