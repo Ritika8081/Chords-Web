@@ -47,9 +47,9 @@ import {
 } from "../components/ui/popover";
 
 // Import the new helper files:
-import { connectSerial, disconnectSerial, processPacket } from "./serialAndDataProcessor";
+import { processPacket } from "./serialAndDataProcessor";
 // Import deviceStorage (remains separate)
-import { saveDevice, getDeviceByProductId, getDeviceChannels } from "./deviceStorage";
+import { getDeviceChannels } from "./deviceStorage";
 
 interface ConnectionProps {
     onPauseChange: (pause: boolean) => void; // Callback to pass pause state to parent
@@ -748,8 +748,8 @@ const Connection: React.FC<ConnectionProps> = ({
             const data = await getFileCountFromIndexedDB();
             setDatasets(data);
 
-            // Important: ensure connection flag is set BEFORE reading data
-            setTimeout(() => readData(), 100);
+          
+            readData();
 
             await navigator.wakeLock.request("screen");
 
