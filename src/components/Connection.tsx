@@ -46,10 +46,13 @@ import {
     PopoverTrigger,
 } from "../components/ui/popover";
 
-// Import the new helper files:
-import { processPacket } from "./serialAndDataProcessor";
-// Import deviceStorage (remains separate)
-import { getDeviceChannels } from "./deviceStorage";
+import {
+    processPacket,
+    disconnectSerial,
+    initDevice
+  } from "./serialAndDataProcessor";
+  
+import {getDeviceChannels } from "./deviceStorage";  
 
 interface ConnectionProps {
     onPauseChange: (pause: boolean) => void; // Callback to pass pause state to parent
@@ -604,165 +607,141 @@ const Connection: React.FC<ConnectionProps> = ({
     };
 
 
-    const connectToSerialDevice = async ({ onSuccess, setLoading, isFFT = false }: ConnectOptions) => {
+   
+    const connectToSerialDevice = async ({
+        onSuccess,
+        setLoading,
+        isFFT = false
+      }: ConnectOptions) => {
         try {
-            if (portRef.current && portRef.current.readable) {
-                await disconnectDevice();
-            }
-
-            setLoading(true);
-
-            const savedPorts = JSON.parse(localStorage.getItem("savedDevices") || "[]");
-            const ports = await navigator.serial.getPorts();
-
-            let port: SerialPort | null = ports.find((p) => {
-                const info = p.getInfo();
-                return savedPorts.some((saved: SavedDevice) => saved.usbProductId === info.usbProductId);
-            }) || null;
-
-            if (isFFT) {
-                handleFrequencySelectionEXG(0, 3);
-            }
-
-            let baudRate: number;
-            let serialTimeout: number;
-
-            // If user needs to select a new port
-            if (!port) {
-                console.log("Requesting port...");
-                port = await navigator.serial.requestPort();
-                console.log("Port selected:", port);
-
-                const newPortInfo = await port.getInfo();
-                const usbProductId = newPortInfo.usbProductId ?? 0;
-
-                const board = BoardsList.find((b) => b.field_pid === usbProductId);
-                baudRate = board?.baud_Rate ?? 230400;
-                serialTimeout = board?.serial_timeout ?? 2000;
-
-            } else {
-                const info = port.getInfo();
-                const savedDevice = savedPorts.find((saved: SavedDevice) => saved.usbProductId === info.usbProductId);
-                baudRate = savedDevice?.baudRate || 230400;
-                serialTimeout = savedDevice?.serialTimeout || 2000;
-            }
-
-            // Only open the port once here
-            if (port.readable === null) {
-                await port.open({ baudRate });
-            }
-
-            // Setup serial refs (reader/writer)
-            portRef.current = port;
-            if (port.readable) {
-                readerRef.current = port.readable.getReader();
-            }
-            if (port.writable) {
-                writerRef.current = port.writable.getWriter();
-            }
-
-            // Send "WHORU\n" command to get device identity
-            if (writerRef.current) {
-                const whoAreYouMessage = new TextEncoder().encode("WHORU\n");
-                setTimeout(() => writerRef.current?.write(whoAreYouMessage), serialTimeout);
-            }
-
-            let responseBuffer = "";
-            if (readerRef.current) {
-                while (true) {
-                    const { value, done } = await readerRef.current.read();
-                    if (done) break;
-                    if (value) {
-                        responseBuffer += new TextDecoder().decode(value);
-                        if (responseBuffer.includes("\n")) break;
-                    }
-                }
-            }
-
-            const response = responseBuffer.trim().split("\n").pop();
-            const extractedName = response?.match(/[A-Za-z0-9\-_\s]+$/)?.[0]?.trim() || "Unknown Device";
-            devicenameref.current = extractedName;
-
-            const currentPortInfo = port.getInfo();
-            const usbProductId = currentPortInfo.usbProductId ?? 0;
-
-            const lastSelectedChannels = getDeviceChannels(extractedName);
-            setSelectedChannels(lastSelectedChannels);
-
-            // Save device if not already stored
-            if (!savedPorts.find((saved: SavedDevice) => saved.deviceName === extractedName)) {
-                savedPorts.push({
-                    deviceName: extractedName,
-                    usbProductId,
-                    baudRate,
-                    serialTimeout,
-                    selectedChannels,
-                    usbVendorId: currentPortInfo.usbVendorId,
-                });
-                localStorage.setItem("savedDevices", JSON.stringify(savedPorts));
-            }
-
-            // Format and display device info
-            const {
-                formattedInfo,
-                adcResolution,
-                channelCount,
-                baudRate: extractedBaudRate,
-                serialTimeout: extractedSerialTimeout,
-            } = formatPortInfo(currentPortInfo, extractedName, usbProductId);
-
-            if (channelCount) {
-                maxCanvasElementCountRef.current = channelCount;
-            }
-
-            const allSelected = initialSelectedChannelsRef.current.length === channelCount;
-            setIsAllEnabledChannelSelected(!allSelected);
-
-            baudRate = extractedBaudRate ?? baudRate;
-            serialTimeout = extractedSerialTimeout ?? serialTimeout;
-
-            toast.success("Connection Successful", {
-                description: (
-                    <div className="mt-2 flex flex-col space-y-1">
-                        <p>Device: {formattedInfo}</p>
-                        <p>Product ID: {usbProductId}</p>
-                        <p>Baud Rate: {baudRate}</p>
-                        {adcResolution && <p>Resolution: {adcResolution} bits</p>}
-                        {channelCount && <p>Channel: {channelCount}</p>}
-                    </div>
-                ),
+          // Disconnect any previous connection
+          if (portRef.current && portRef.current.readable) {
+            await disconnectSerial(portRef, readerRef, writerRef);
+          }
+          setLoading(true);
+      
+          // Retrieve saved device settings from localStorage.
+          const savedPorts: SavedDevice[] = JSON.parse(localStorage.getItem("savedDevices") || "[]");
+          const ports = await navigator.serial.getPorts();
+          let port: SerialPort | null = ports.find((p) => {
+            const info = p.getInfo();
+            return savedPorts.some((saved: SavedDevice) => saved.usbProductId === info.usbProductId);
+          }) || null;
+      
+          if (isFFT) {
+            handleFrequencySelectionEXG(0, 3);
+          }
+      
+          let baudRate: number;
+          let serialTimeout: number;
+      
+          // If no matching port is found, request one from the user.
+          if (!port) {
+            console.log("Requesting port...");
+            port = await navigator.serial.requestPort();
+            console.log("Port selected:", port);
+            const newPortInfo = await port.getInfo();
+            const usbProductId = newPortInfo.usbProductId ?? 0;
+            const board = BoardsList.find((b) => b.field_pid === usbProductId);
+            baudRate = board?.baud_Rate ?? 230400;
+            serialTimeout = board?.serial_timeout ?? 2000;
+          } else {
+            const info = port.getInfo();
+            const savedDevice = savedPorts.find((saved: SavedDevice) => saved.usbProductId === info.usbProductId);
+            baudRate = savedDevice?.baudRate || 230400;
+            serialTimeout = savedDevice?.serialTimeout || 2000;
+          }
+      
+          // Open the port if not already open.
+          if (!port.readable) {
+            await port.open({ baudRate });
+          }
+          portRef.current = port;
+      
+          // IMPORTANT: Do NOT assign the main reader here; instead, assign only the writer.
+          if (port.writable) {
+            writerRef.current = port.writable.getWriter();
+          }
+      
+          const extractedName = await initDevice({ portRef, readerRef, writerRef }, 4000, 2000);
+          devicenameref.current = extractedName;
+      
+          // After initDevice() returns, assign the main reader for continuous reading.
+          if (port.readable) {
+            readerRef.current = port.readable.getReader();
+          }
+      
+          // Continue with the rest of your connection code...
+          const currentPortInfo = port.getInfo();
+          const usbProductId = currentPortInfo.usbProductId ?? 0;
+          const lastSelectedChannels = getDeviceChannels(extractedName);
+          setSelectedChannels(lastSelectedChannels);
+      
+          if (!savedPorts.find((saved: SavedDevice) => saved.deviceName === extractedName)) {
+            savedPorts.push({
+              deviceName: extractedName,
+              usbProductId,
+              baudRate,
+              serialTimeout,
+              selectedChannels: lastSelectedChannels,
+              usbVendorId: currentPortInfo.usbVendorId ?? 0,
             });
-
-            // Send START command to begin data stream
-            if (writerRef.current) {
-                const startMessage = new TextEncoder().encode("START\n");
-                setTimeout(() => writerRef.current?.write(startMessage), 2000);
-            }
-
-            setSelectedChannels(initialSelectedChannelsRef.current);
-            setIsDeviceConnected(true);
-            setIsDisplay(true);
-            setCanvasCount(1);
-            isDeviceConnectedRef.current = true;
-
-            const data = await getFileCountFromIndexedDB();
-            setDatasets(data);
-
-          
-            readData();
-
-            await navigator.wakeLock.request("screen");
-
-            onSuccess();
-
+            localStorage.setItem("savedDevices", JSON.stringify(savedPorts));
+          }
+      
+          const {
+            formattedInfo,
+            adcResolution,
+            channelCount,
+            baudRate: extractedBaudRate,
+            serialTimeout: extractedSerialTimeout
+          } = formatPortInfo(currentPortInfo, extractedName, usbProductId);
+          if (channelCount) {
+            maxCanvasElementCountRef.current = channelCount;
+          }
+      
+          baudRate = extractedBaudRate ?? baudRate;
+          serialTimeout = extractedSerialTimeout ?? serialTimeout;
+      
+          toast.success("Connection Successful", {
+            description: (
+              <div className="mt-2 flex flex-col space-y-1">
+                <p>Device: {formattedInfo}</p>
+                <p>Product ID: {usbProductId}</p>
+                <p>Baud Rate: {baudRate}</p>
+                {adcResolution && <p>Resolution: {adcResolution} bits</p>}
+                {channelCount && <p>Channel: {channelCount}</p>}
+              </div>
+            )
+          });
+      
+          setSelectedChannels(initialSelectedChannelsRef.current);
+          setIsDeviceConnected(true);
+          setIsDisplay(true);
+          setCanvasCount(1);
+          isDeviceConnectedRef.current = true;
+      
+          // Load any stored datasets.
+          const data = await getFileCountFromIndexedDB();
+          setDatasets(data);
+      
+          console.log("Starting read loop...");
+          console.log("Receiving data...");
+          // Start reading incoming data.
+          readData();
+      
+          // Request a screen wake lock.
+          await navigator.wakeLock.request("screen");
+          onSuccess();
         } catch (error) {
-            await disconnectDevice();
-            console.error("Error connecting to device:", error);
-            toast.error("Failed to connect to device.");
+          await disconnectSerial(portRef, readerRef, writerRef);
+          console.error("Error connecting to device:", error);
+          toast.error("Failed to connect to device.");
         } finally {
-            setLoading(false);
+          setLoading(false);
         }
-    };
+      };
+      
 
     const connectToDevice = () => {
         connectToSerialDevice({
